@@ -16,7 +16,6 @@ intended behavior on fresh AND reused connections.
 from __future__ import annotations
 
 from alembic import op
-
 from chartwright_db.models import RLS_TABLES
 
 revision = "0002"

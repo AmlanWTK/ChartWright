@@ -1,0 +1,26 @@
+[project]
+name = "ingestion"
+version = "0.1.0"
+description = "Document intake service (CP09): validate, scan, hash, dedupe, store, emit RECEIVED."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chartwright-db",
+    "chartwright-schemas",
+    "fastapi>=0.112.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "boto3>=1.34.0",
+    "pydantic-settings>=2.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ingestion"]
+
+[tool.uv.sources]
+chartwright-db = { workspace = true }
+chartwright-schemas = { workspace = true }

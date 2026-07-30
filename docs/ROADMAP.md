@@ -30,8 +30,8 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP05 | Kubernetes platform & GitOps delivery | CP04 | ⏸ Deferred (ADR-0007) |
 | CP06 | Observability & platform scaffolding | CP05 | ⬜ |
 | CP07 | Identity, secrets & baseline security controls | CP05 | ⬜ |
-| CP08 | Data model & persistence layer (Postgres, RLS, audit) | CP04-L, CP03 | 🔵 In review |
-| CP09 | Object storage & document intake service | CP08, CP07 | ⬜ |
+| CP08 | Data model & persistence layer (Postgres, RLS, audit) | CP04-L, CP03 | ✅ Done |
+| CP09 | Object storage & document intake service | CP08 (CP07 deferred: dev tenant header) | 🔵 In review |
 | CP10 | Workflow orchestration (Temporal) & event backbone (Kafka) | CP09, CP06 | ⬜ |
 | CP11 | Model Gateway (router, provider abstraction, metering) | CP10 | ⬜ |
 | CP12 | GPU serving (vLLM) & Tier-0 OCR VLM + grounding | CP11 | ⬜ |
@@ -67,4 +67,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01–CP04-L done · CP08 in review · 4/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP08: **CP09 — object storage & document intake service** (MinIO + ingestion API).
+**Current progress:** CP01–CP08 done (CP04→CP07 partially deferred per ADR-0007) · CP09 in review · 5/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP08: **CP09 — object storage & document intake service** (MinIO + ingestion API).

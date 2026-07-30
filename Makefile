@@ -69,6 +69,9 @@ db-seed: ## Seed demo tenants + synthetic documents
 test-integration: ## Run integration tests (requires local stack + migrations)
 	uv run pytest -m integration
 
+run-ingestion: ## Run the ingestion service locally (port 8100)
+	uv run uvicorn ingestion.main:app --reload --port 8100
+
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .coverage htmlcov
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
