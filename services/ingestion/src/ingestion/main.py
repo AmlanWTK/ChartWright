@@ -22,7 +22,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ingestion.config import Settings, get_settings
-from ingestion.events import LoggingEventPublisher
+from ingestion.events import publisher_from_env
 from ingestion.intake import IntakeService
 from ingestion.scanner import EicarScanner
 from ingestion.storage import ObjectStorage
@@ -42,7 +42,8 @@ def _intake() -> IntakeService:
         engine=build_engine(),
         storage=ObjectStorage(settings),
         scanner=EicarScanner(),
-        events=LoggingEventPublisher(),
+        # Transport by config: CHARTWRIGHT_EVENT_PUBLISHER=kafka wires the real pipeline.
+        events=publisher_from_env(),
         settings=settings,
     )
 

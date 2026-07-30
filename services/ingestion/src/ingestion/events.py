@@ -1,38 +1,36 @@
-"""Domain-event emission behind a protocol seam.
+"""Ingestion's event contract. Transports live in chartwright-events (CP10).
 
-CP09 emits the ``document.received`` event; the durable Kafka/Temporal backbone that
-consumes it is CP10's deliverable. Until then a logging publisher records exactly what
-will be published — the call sites and payload contract are final, only the transport
-changes when CP10 lands its KafkaEventPublisher. Payloads carry references (IDs), never
-PHI, per the threat model.
+The publisher implementations moved to the shared ``chartwright_events`` library when the
+Kafka transport landed; this module keeps the ingestion-domain event *builder* and
+re-exports the publisher types its callers/tests use. Payloads: references only, no PHI.
 """
 
 from __future__ import annotations
 
-import json
-import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any
 
-logger = logging.getLogger("chartwright.events")
+from chartwright_events import (
+    EventPublisher,
+    KafkaEventPublisher,
+    LoggingEventPublisher,
+    publisher_from_env,
+)
 
-
-class EventPublisher(Protocol):
-    def publish(self, event_type: str, payload: dict[str, Any]) -> None: ...
-
-
-class LoggingEventPublisher:
-    """Dev/CP09 publisher: structured log of the would-be event (no PHI in payloads)."""
-
-    def publish(self, event_type: str, payload: dict[str, Any]) -> None:
-        logger.info("event %s %s", event_type, json.dumps(payload, default=str))
+__all__ = [
+    "EventPublisher",
+    "KafkaEventPublisher",
+    "LoggingEventPublisher",
+    "document_received_event",
+    "publisher_from_env",
+]
 
 
 def document_received_event(
     *, tenant_id: uuid.UUID, document_id: uuid.UUID, source_channel: str, dedupe: bool
 ) -> tuple[str, dict[str, Any]]:
-    """The contract for the RECEIVED event (consumed by the CP10 workflow)."""
+    """The contract for the RECEIVED event (consumed by the CP10 pipeline trigger)."""
     return (
         "document.received",
         {

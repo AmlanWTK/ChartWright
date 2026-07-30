@@ -4,7 +4,7 @@
 # or use the equivalents documented in CONTRIBUTING.md.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup lint format typecheck test build security precommit clean local-up local-down local-nuke local-check db-upgrade db-downgrade db-seed test-integration
+.PHONY: help setup lint format typecheck test build security precommit clean local-up local-down local-nuke local-check db-upgrade db-downgrade db-seed test-integration run-ingestion run-worker run-trigger
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -71,6 +71,12 @@ test-integration: ## Run integration tests (requires local stack + migrations)
 
 run-ingestion: ## Run the ingestion service locally (port 8100)
 	uv run uvicorn ingestion.main:app --reload --port 8100
+
+run-worker: ## Run the pipeline Temporal worker
+	uv run python -m pipeline.worker
+
+run-trigger: ## Run the Kafka->Temporal trigger
+	uv run python -m pipeline.trigger
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .coverage htmlcov

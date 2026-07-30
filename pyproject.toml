@@ -82,6 +82,18 @@ no_implicit_optional = true
 show_error_codes = true
 pretty = true
 files = ["services", "libs"]
+# Monorepo module resolution: with py.typed packages, mypy needs the src roots declared
+# so each file maps to exactly one module name (e.g. pipeline.config, never bare config).
+explicit_package_bases = true
+mypy_path = [
+    "libs/chartwright-schemas/src",
+    "libs/chartwright-db/src",
+    "libs/chartwright-events/src",
+    "libs/chartwright-synthdata/src",
+    "services/hello/src",
+    "services/ingestion/src",
+    "services/pipeline/src",
+]
 # Monorepo: multiple packages each have a `tests/` dir, which collide as module names.
 # Tests are exercised by pytest; mypy focuses on src. (Standard monorepo practice.)
 exclude = ["(^|/)tests(/|$)"]

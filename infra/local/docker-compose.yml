@@ -79,6 +79,20 @@ services:
       timeout: 10s
       retries: 12
 
+  # One-shot: pre-create application topics so consumers don't log
+  # UNKNOWN_TOPIC_OR_PART while waiting for auto-create on first produce.
+  kafka-init:
+    image: apache/kafka:3.8.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic chartwright.documents.received --partitions 3 --replication-factor 1 &&
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic chartwright.dlq --partitions 1 --replication-factor 1 &&
+      echo 'topics ready'
+      "
+
   temporal:
     image: temporalio/auto-setup:1.25.2
     container_name: cw-temporal
