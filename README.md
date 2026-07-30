@@ -47,6 +47,11 @@ One checkpoint at a time. Each is specified, approved, implemented, tested again
 
 ## Current checkpoint
 
-**CP02 — Repository, Tooling & CI Foundation.** Monorepo scaffold (`services/`, `frontend/`, `libs/`), quality gates (Ruff, mypy, ESLint, Prettier, TypeScript), pre-commit hooks, Conventional Commits, and GitHub Actions CI (lint → type → test → build → security scans). A reference `hello` service and frontend package prove the CI lanes. See [`CONTRIBUTING.md`](CONTRIBUTING.md) to set up your environment.
+**CP03 — Domain Model, Taxonomy & Synthetic-Data Strategy.** Two workspace libraries:
 
-CP01 (charter, ADRs, C4 diagrams, traceability, threat model, governance) is complete — see `docs/`.
+- `libs/chartwright-schemas` — the shared domain types: the **grounding contract** (every extracted field carries page + bbox + source span + calibrated confidence, enforced by Pydantic), the clinical **document taxonomy**, per-type **extraction schemas** with critical-field marking, and the versioned `ExtractionResult` envelope.
+- `libs/chartwright-synthdata` — a deterministic **synthetic document generator** (`uv run synthdata`) producing PA form images with pixel-accurate ground-truth labels and controllable fax-style degradation (`clean`/`fax`/`bad_fax`) — the PHI-free foundation for development and the eval gold sets.
+
+Domain docs: [`docs/domain/taxonomy.md`](docs/domain/taxonomy.md), [`docs/domain/vocabularies.md`](docs/domain/vocabularies.md), [`docs/domain/gold-set-structure.md`](docs/domain/gold-set-structure.md).
+
+CP01 (architecture baseline) and CP02 (tooling + CI) are complete — see `docs/ROADMAP.md`.

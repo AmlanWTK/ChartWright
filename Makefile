@@ -10,7 +10,7 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Install all Python + Node dependencies and pre-commit hooks
-	uv sync --all-groups
+	uv sync --all-packages --all-groups
 	pnpm install
 	pre-commit install --install-hooks
 	pre-commit install --hook-type commit-msg

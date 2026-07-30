@@ -23,8 +23,8 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | # | Checkpoint | Depends on | Status |
 |---|-----------|-----------|--------|
 | CP01 | Project charter, ADRs & architecture baseline | — | ✅ Done |
-| CP02 | Repository, tooling & CI foundation | CP01 | 🔵 In review |
-| CP03 | Domain model, taxonomy & synthetic-data strategy | CP01 | ⬜ |
+| CP02 | Repository, tooling & CI foundation | CP01 | ✅ Done |
+| CP03 | Domain model, taxonomy & synthetic-data strategy | CP01 | 🔵 In review |
 | CP04 | Infrastructure as Code & cloud environments | CP02 | ⬜ |
 | CP05 | Kubernetes platform & GitOps delivery | CP04 | ⬜ |
 | CP06 | Observability & platform scaffolding | CP05 | ⬜ |
@@ -66,4 +66,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01 done · CP02 in review · 1/34 complete.
+**Current progress:** CP01–CP02 done · CP03 in review · 2/34 complete.

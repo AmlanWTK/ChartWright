@@ -1,0 +1,23 @@
+[project]
+name = "chartwright-synthdata"
+version = "0.1.0"
+description = "Synthetic clinical-document generator: realistic PA forms + ground-truth labels, with controllable fax-style degradation. No PHI, ever."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chartwright-schemas",
+    "pillow>=10.4.0",
+]
+
+[project.scripts]
+synthdata = "chartwright_synthdata.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chartwright_synthdata"]
+
+[tool.uv.sources]
+chartwright-schemas = { workspace = true }

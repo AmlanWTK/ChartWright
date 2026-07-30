@@ -56,8 +56,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101"]  # allow assert in tests
-"**/test_*.py" = ["S101"]
+# Tests: allow assert (S101) and seeded random for determinism tests (S311).
+"**/tests/**" = ["S101", "S311"]
+"**/test_*.py" = ["S101", "S311"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["hello", "chartwright"]
@@ -80,17 +81,20 @@ no_implicit_optional = true
 show_error_codes = true
 pretty = true
 files = ["services", "libs"]
+# Monorepo: multiple packages each have a `tests/` dir, which collide as module names.
+# Tests are exercised by pytest; mypy focuses on src. (Standard monorepo practice.)
+exclude = ["(^|/)tests(/|$)"]
 
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
+# (tests are excluded from mypy above; pytest owns them)
 
 # ---------------------------------------------------------------------------
 # pytest + coverage
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra -q --strict-markers"
+# importlib mode: lets multiple packages have their own tests/ dirs without
+# top-level module-name collisions (standard monorepo setup; no tests/__init__.py).
+addopts = "-ra -q --strict-markers --import-mode=importlib"
 testpaths = ["services", "libs"]
 asyncio_mode = "auto"
 markers = [

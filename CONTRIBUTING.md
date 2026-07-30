@@ -17,8 +17,8 @@ This guide covers local setup, the toolchain, and the workflow. Read `docs/worki
 
 ```bash
 # from the repo root
-uv sync --all-groups          # Python deps for all workspace members
-pnpm install                  # Node deps
+uv sync --all-packages --all-groups   # Python deps for ALL workspace members (--all-packages matters)
+pnpm install                          # Node deps
 pre-commit install --install-hooks
 pre-commit install --hook-type commit-msg
 ```
