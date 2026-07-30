@@ -25,12 +25,12 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP01 | Project charter, ADRs & architecture baseline | — | ✅ Done |
 | CP02 | Repository, tooling & CI foundation | CP01 | ✅ Done |
 | CP03 | Domain model, taxonomy & synthetic-data strategy | CP01 | ✅ Done |
-| CP04-L | **Local development platform (Docker Compose)** — replaces CP04 sequencing per ADR-0007; cloud IaC deferred | CP02 | 🔵 In review |
+| CP04-L | **Local development platform (Docker Compose)** — replaces CP04 sequencing per ADR-0007; cloud IaC deferred | CP02 | ✅ Done |
 | CP04 | Infrastructure as Code & cloud environments | CP02 | ⏸ Deferred (ADR-0007) |
 | CP05 | Kubernetes platform & GitOps delivery | CP04 | ⏸ Deferred (ADR-0007) |
 | CP06 | Observability & platform scaffolding | CP05 | ⬜ |
 | CP07 | Identity, secrets & baseline security controls | CP05 | ⬜ |
-| CP08 | Data model & persistence layer (Postgres, RLS, audit) | CP04, CP03 | ⬜ |
+| CP08 | Data model & persistence layer (Postgres, RLS, audit) | CP04-L, CP03 | 🔵 In review |
 | CP09 | Object storage & document intake service | CP08, CP07 | ⬜ |
 | CP10 | Workflow orchestration (Temporal) & event backbone (Kafka) | CP09, CP06 | ⬜ |
 | CP11 | Model Gateway (router, provider abstraction, metering) | CP10 | ⬜ |
@@ -67,4 +67,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01–CP03 done · CP04-L in review · 3/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP04-L: **CP08 — data model & persistence layer** against the local Postgres.
+**Current progress:** CP01–CP04-L done · CP08 in review · 4/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP08: **CP09 — object storage & document intake service** (MinIO + ingestion API).

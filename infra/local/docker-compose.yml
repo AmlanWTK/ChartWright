@@ -25,7 +25,9 @@ services:
       POSTGRES_PASSWORD: chartwright_dev # dev-only
       POSTGRES_DB: chartwright
     ports:
-      - "5432:5432"
+      # Host port 15432: dev machines commonly have native Postgres on 5432 AND 5433
+      # (multi-version installs), so we use an unambiguous high port.
+      - "15432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -89,7 +91,8 @@ services:
       POSTGRES_SEEDS: postgres
       POSTGRES_USER: chartwright
       POSTGRES_PWD: chartwright_dev # dev-only
-      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      # NOTE: do not set DYNAMIC_CONFIG_FILE_PATH — the auto-setup image ships its own
+      # default dynamic config; pointing at the (absent) development-sql.yaml kills startup.
     ports:
       - "7233:7233"
     healthcheck:

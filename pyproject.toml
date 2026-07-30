@@ -104,7 +104,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["services", "libs"]
-omit = ["**/tests/**", "**/__init__.py"]
+omit = ["**/tests/**", "**/__init__.py", "**/alembic/**"]
 
 [tool.coverage.report]
 show_missing = true

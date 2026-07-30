@@ -47,7 +47,9 @@ One checkpoint at a time. Each is specified, approved, implemented, tested again
 
 ## Current checkpoint
 
-**CP04-L — Local Development Platform.** The full backing stack via Docker Compose (`make local-up`): Postgres 16, Kafka (KRaft), Temporal + Web UI, Redis 7, and MinIO (S3-compatible, auto-created `chartwright-documents` bucket) — the same engines production will use, per ADR-0007 (local-first; cloud IaC deferred until GPU serving needs it). Verify with `make local-check`. See [`infra/local/README.md`](infra/local/README.md).
+**CP08 — Data Model & Persistence Layer.** `libs/chartwright-db`: SQLAlchemy 2.0 typed models for the relational spine (tenants, documents, pages, grounded extractions, review tasks, audit), with three production guarantees: **DB-enforced tenant isolation** (row-level security keyed to a per-transaction tenant context, app connects as a non-superuser role), **audit-on-write** (append-only `audit_log` written in the same transaction, UPDATE/DELETE physically ungranted), and **migrations-only schema** (Alembic). Verified by integration tests that actively attempt cross-tenant reads/writes and audit tampering. `make db-upgrade && make db-seed && make test-integration`.
+
+Previously completed — **CP04-L — Local Development Platform.** The full backing stack via Docker Compose (`make local-up`): Postgres 16, Kafka (KRaft), Temporal + Web UI, Redis 7, and MinIO (S3-compatible, auto-created `chartwright-documents` bucket) — the same engines production will use, per ADR-0007 (local-first; cloud IaC deferred until GPU serving needs it). Verify with `make local-check`. See [`infra/local/README.md`](infra/local/README.md).
 
 Previously completed — **CP03 — Domain Model, Taxonomy & Synthetic-Data Strategy.** Two workspace libraries:
 

@@ -34,7 +34,7 @@ class HttpCheck:
 
 
 TCP_CHECKS: list[TcpCheck] = [
-    TcpCheck("postgres", "localhost", 5432),
+    TcpCheck("postgres", "localhost", 15432),  # high port: avoid native-Postgres conflicts
     TcpCheck("redis", "localhost", 6379),
     TcpCheck("kafka", "localhost", 9092),
     TcpCheck("temporal", "localhost", 7233),

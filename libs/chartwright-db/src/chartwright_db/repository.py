@@ -1,0 +1,242 @@
+"""Repositories: the only way services touch tenant data. Audit-on-write built in.
+
+Every mutating method records an ``audit_log`` row in the same session/transaction —
+if the change commits, its audit trail commits with it (and vice versa).
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from chartwright_db.models import (
+    AuditLog,
+    Document,
+    ExtractedField,
+    Extraction,
+    ReviewTask,
+)
+
+
+def _snapshot(obj: object, keys: tuple[str, ...]) -> dict[str, Any]:
+    return {k: _jsonable(getattr(obj, k)) for k in keys}
+
+
+def _jsonable(v: object) -> object:
+    return str(v) if isinstance(v, uuid.UUID) else v
+
+
+class _AuditedRepository:
+    """Base: holds the session, the acting principal, and the audit writer."""
+
+    def __init__(self, session: Session, *, actor: str, correlation_id: str | None = None):
+        self.session = session
+        self.actor = actor
+        self.correlation_id = correlation_id
+
+    def _tenant_id(self) -> uuid.UUID:
+        """The tenant bound to this transaction (set by tenant_context)."""
+        from sqlalchemy import text
+
+        value = self.session.execute(
+            text("SELECT current_setting('app.current_tenant', true)")
+        ).scalar_one()
+        if not value:
+            msg = "No tenant context: repositories must run inside tenant_context()."
+            raise RuntimeError(msg)
+        return uuid.UUID(value)
+
+    def _audit(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: uuid.UUID,
+        *,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+    ) -> None:
+        self.session.add(
+            AuditLog(
+                tenant_id=self._tenant_id(),
+                actor=self.actor,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                before=before,
+                after=after,
+                correlation_id=self.correlation_id,
+            )
+        )
+
+
+class DocumentRepository(_AuditedRepository):
+    _DOC_SNAPSHOT = ("status", "doc_type", "page_count", "content_hash")
+
+    def create_document(
+        self,
+        *,
+        source_channel: str,
+        content_hash: str,
+        page_count: int = 0,
+        external_ref: str | None = None,
+        original_object_key: str | None = None,
+    ) -> Document:
+        """Create a document, or return the existing one with the same content hash
+        (idempotent ingestion — FR-ING-04)."""
+        existing = self.session.execute(
+            select(Document).where(Document.content_hash == content_hash)
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing
+
+        doc = Document(
+            tenant_id=self._tenant_id(),
+            source_channel=source_channel,
+            content_hash=content_hash,
+            page_count=page_count,
+            external_ref=external_ref,
+            original_object_key=original_object_key,
+        )
+        self.session.add(doc)
+        self.session.flush()  # assign PK for the audit row
+        self._audit("create", "document", doc.id, after=_snapshot(doc, self._DOC_SNAPSHOT))
+        return doc
+
+    def transition_status(self, document_id: uuid.UUID, new_status: str) -> Document:
+        doc = self.session.get_one(Document, document_id)
+        before = _snapshot(doc, self._DOC_SNAPSHOT)
+        doc.status = new_status
+        self.session.flush()
+        self._audit(
+            "status_change",
+            "document",
+            doc.id,
+            before=before,
+            after=_snapshot(doc, self._DOC_SNAPSHOT),
+        )
+        return doc
+
+    def get(self, document_id: uuid.UUID) -> Document | None:
+        return self.session.get(Document, document_id)
+
+    def list_by_status(self, status: str, *, limit: int = 100) -> list[Document]:
+        return list(
+            self.session.execute(
+                select(Document).where(Document.status == status).limit(limit)
+            ).scalars()
+        )
+
+
+class ExtractionRepository(_AuditedRepository):
+    def create_extraction(
+        self,
+        *,
+        document_id: uuid.UUID,
+        doc_type: str,
+        schema_version: str,
+        overall_confidence: float | None = None,
+    ) -> Extraction:
+        ext = Extraction(
+            tenant_id=self._tenant_id(),
+            document_id=document_id,
+            doc_type=doc_type,
+            schema_version=schema_version,
+            overall_confidence=overall_confidence,
+        )
+        self.session.add(ext)
+        self.session.flush()
+        self._audit(
+            "create",
+            "extraction",
+            ext.id,
+            after={"document_id": str(document_id), "doc_type": doc_type},
+        )
+        return ext
+
+    def add_field(
+        self,
+        *,
+        extraction_id: uuid.UUID,
+        field_key: str,
+        value_raw: str,
+        confidence: float,
+        page_number: int,
+        bbox: dict[str, float],
+        source_span: str,
+        tier: int = 0,
+        needs_review: bool = False,
+    ) -> ExtractedField:
+        field = ExtractedField(
+            tenant_id=self._tenant_id(),
+            extraction_id=extraction_id,
+            field_key=field_key,
+            value_raw=value_raw,
+            confidence=confidence,
+            page_number=page_number,
+            bbox=bbox,
+            source_span=source_span,
+            tier=tier,
+            needs_review=needs_review,
+        )
+        self.session.add(field)
+        self.session.flush()
+        # Note: field creation is audited at extraction granularity to bound audit volume;
+        # reviewer *corrections* (the consequential change) are audited per field below.
+        return field
+
+    def record_review(
+        self,
+        field_id: uuid.UUID,
+        *,
+        action: str,  # accept|edit|reject
+        corrected_value: str | None = None,
+        reviewer_id: uuid.UUID | None = None,
+    ) -> ExtractedField:
+        field = self.session.get_one(ExtractedField, field_id)
+        before = {"value_raw": field.value_raw, "review_action": field.review_action}
+        field.review_action = action
+        field.corrected_value = corrected_value
+        field.reviewed_by = reviewer_id
+        field.needs_review = False
+        self.session.flush()
+        self._audit(
+            "review",
+            "extracted_field",
+            field.id,
+            before=before,
+            after={"review_action": action, "corrected_value": corrected_value},
+        )
+        return field
+
+
+class ReviewTaskRepository(_AuditedRepository):
+    def open_task(
+        self,
+        *,
+        document_id: uuid.UUID,
+        reason: str,
+        priority: int = 100,
+    ) -> ReviewTask:
+        task = ReviewTask(
+            tenant_id=self._tenant_id(),
+            document_id=document_id,
+            reason=reason,
+            priority=priority,
+        )
+        self.session.add(task)
+        self.session.flush()
+        self._audit("create", "review_task", task.id, after={"reason": reason})
+        return task
+
+    def next_open(self, *, limit: int = 20) -> list[ReviewTask]:
+        return list(
+            self.session.execute(
+                select(ReviewTask)
+                .where(ReviewTask.status == "open")
+                .order_by(ReviewTask.priority, ReviewTask.opened_at)
+                .limit(limit)
+            ).scalars()
+        )

@@ -22,7 +22,7 @@ First start pulls images (~1–2 GB) and takes a few minutes; Temporal waits for
 
 | Service | Endpoint | Credentials (dev-only) | Prod equivalent |
 |---------|----------|------------------------|-----------------|
-| Postgres 16 | `localhost:5432` (db `chartwright`) | `chartwright` / `chartwright_dev` | RDS |
+| Postgres 16 | `localhost:15432` (db `chartwright`; high host port avoids native-Postgres conflicts on 5432/5433) | `chartwright` / `chartwright_dev` | RDS |
 | Kafka (KRaft) | `localhost:9092` | — | MSK |
 | Temporal | `localhost:7233` | — | Temporal on EKS |
 | Temporal Web UI | http://localhost:8233 | — | — |

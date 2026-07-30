@@ -4,7 +4,7 @@
 # or use the equivalents documented in CONTRIBUTING.md.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup lint format typecheck test build security precommit clean local-up local-down local-nuke local-check
+.PHONY: help setup lint format typecheck test build security precommit clean local-up local-down local-nuke local-check db-upgrade db-downgrade db-seed test-integration
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -56,6 +56,18 @@ local-nuke: ## Stop the local dev platform AND delete all data volumes
 
 local-check: ## Smoke-check every local service
 	uv run python scripts/check_local_stack.py
+
+db-upgrade: ## Apply database migrations (admin role)
+	cd libs/chartwright-db && uv run alembic upgrade head
+
+db-downgrade: ## Roll back the last migration
+	cd libs/chartwright-db && uv run alembic downgrade -1
+
+db-seed: ## Seed demo tenants + synthetic documents
+	uv run python scripts/seed_dev_db.py
+
+test-integration: ## Run integration tests (requires local stack + migrations)
+	uv run pytest -m integration
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .coverage htmlcov
