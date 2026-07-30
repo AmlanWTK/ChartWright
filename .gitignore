@@ -33,6 +33,9 @@ coverage.xml
 htmlcov/
 *.sarif
 
+# Local compose overrides (per-machine port tweaks etc.)
+docker-compose.override.yml
+
 # Terraform
 .terraform/
 *.tfstate

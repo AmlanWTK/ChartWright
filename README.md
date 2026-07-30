@@ -47,7 +47,9 @@ One checkpoint at a time. Each is specified, approved, implemented, tested again
 
 ## Current checkpoint
 
-**CP03 — Domain Model, Taxonomy & Synthetic-Data Strategy.** Two workspace libraries:
+**CP04-L — Local Development Platform.** The full backing stack via Docker Compose (`make local-up`): Postgres 16, Kafka (KRaft), Temporal + Web UI, Redis 7, and MinIO (S3-compatible, auto-created `chartwright-documents` bucket) — the same engines production will use, per ADR-0007 (local-first; cloud IaC deferred until GPU serving needs it). Verify with `make local-check`. See [`infra/local/README.md`](infra/local/README.md).
+
+Previously completed — **CP03 — Domain Model, Taxonomy & Synthetic-Data Strategy.** Two workspace libraries:
 
 - `libs/chartwright-schemas` — the shared domain types: the **grounding contract** (every extracted field carries page + bbox + source span + calibrated confidence, enforced by Pydantic), the clinical **document taxonomy**, per-type **extraction schemas** with critical-field marking, and the versioned `ExtractionResult` envelope.
 - `libs/chartwright-synthdata` — a deterministic **synthetic document generator** (`uv run synthdata`) producing PA form images with pixel-accurate ground-truth labels and controllable fax-style degradation (`clean`/`fax`/`bad_fax`) — the PHI-free foundation for development and the eval gold sets.

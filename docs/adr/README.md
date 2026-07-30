@@ -12,6 +12,7 @@ ADRs capture significant architectural decisions with their context, options, an
 | [0004](0004-postgres-kafka-temporal.md) | Postgres + Kafka + Temporal | Accepted |
 | [0005](0005-bounded-agent.md) | Bounded, tool-limited agent | Accepted |
 | [0006](0006-eval-as-ci-gate.md) | Evaluation harness as a CI gate | Accepted |
+| [0007](0007-local-first-development.md) | Local-first development platform; cloud deferred | Accepted |
 
 ## When to write an ADR
 

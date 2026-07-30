@@ -4,7 +4,7 @@
 # or use the equivalents documented in CONTRIBUTING.md.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup lint format typecheck test build security precommit clean
+.PHONY: help setup lint format typecheck test build security precommit clean local-up local-down local-nuke local-check
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,18 @@ security: ## Run local secret scan (gitleaks must be installed)
 
 precommit: ## Run all pre-commit hooks against all files
 	pre-commit run --all-files
+
+local-up: ## Start the local dev platform (Postgres, Kafka, Temporal, Redis, MinIO)
+	docker compose -f infra/local/docker-compose.yml up -d
+
+local-down: ## Stop the local dev platform (data preserved)
+	docker compose -f infra/local/docker-compose.yml down
+
+local-nuke: ## Stop the local dev platform AND delete all data volumes
+	docker compose -f infra/local/docker-compose.yml down -v
+
+local-check: ## Smoke-check every local service
+	uv run python scripts/check_local_stack.py
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .coverage htmlcov
