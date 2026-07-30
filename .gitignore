@@ -1,0 +1,55 @@
+# Chartwright — baseline ignore (expanded in CP02)
+
+# Secrets & env — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+secrets/
+*.tfvars
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+.next/
+out/
+coverage/
+*.log
+
+# Coverage & scan artifacts
+.coverage
+coverage.xml
+htmlcov/
+*.sarif
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Data — never commit PHI or large artifacts
+data/
+*.pdf
+*.tiff
+*.tif
+models/
+*.ckpt
+*.safetensors

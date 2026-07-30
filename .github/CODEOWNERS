@@ -1,0 +1,10 @@
+# Code ownership — reviewers auto-requested on matching paths.
+# Update as the team grows. Until then, the repo owner owns everything.
+
+*                       @AmlanWTK
+
+# Security-sensitive areas warrant extra scrutiny (kept explicit for when the team grows).
+/.github/                @AmlanWTK
+/infra/                  @AmlanWTK
+/docs/adr/               @AmlanWTK
+/docs/threat-model-v0.md @AmlanWTK

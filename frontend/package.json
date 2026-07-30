@@ -1,0 +1,17 @@
+{
+  "name": "@chartwright/frontend-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference frontend workspace package proving the TS/ESLint/Vitest CI lane. The real review console arrives at CP23.",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.5"
+  }
+}
