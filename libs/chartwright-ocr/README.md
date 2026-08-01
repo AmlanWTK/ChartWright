@@ -34,7 +34,30 @@ ok = verify_at(page, "A1234567", claimed_bbox)  # audit a third-party location c
 uv run python scripts/eval_ocr.py --count 10
 ```
 
-Measures field recall, verify-at-gold rate, and grounding IoU per degradation slice
-(clean / fax / bad_fax) against pixel-accurate synthetic gold labels. Gate: **clean-slice
-recall ≥ 90%**. Expect visible degradation on fax/bad_fax — that gap is exactly why the
-escalation cascade (CP17) exists, and these numbers become its baseline.
+Measures field recall, verify-at-gold rate, and grounding quality per degradation slice
+(clean / fax / bad_fax) against pixel-accurate synthetic gold labels.
+
+**Gates (clean slice):** recall ≥ 90% · coverage ≥ 0.95 · bloat ≤ 2.5. The script exits
+non-zero on failure, so it can gate CI directly.
+
+**Measured baseline** (10 docs/slice, RapidOCR on CPU):
+
+| slice | recall | coverage | IoU | bloat |
+|---------|-------:|---------:|-----:|------:|
+| clean | 100.0% | 1.00 | 0.69 | 1.46 |
+| fax | 99.2% | 1.00 | 0.56 | 1.83 |
+| bad_fax | 79.2% | 0.98 | 0.62 | 1.64 |
+
+That clean→bad_fax gap is exactly why the escalation cascade (CP17) exists, and these
+numbers are its baseline.
+
+### Why coverage, not IoU
+
+The generator records a **tight ink box** (`draw.textbbox`); a detector returns a
+**text-line box** padded to the font's ascender/descender. So even with pixel-perfect
+localization the two disagree by a fixed offset — measured here as IoU ≈ 0.69 while
+horizontal edges agree within ~3px. Raw IoU therefore understates grounding quality and
+is reported for continuity only. **Coverage** (is the gold ink inside the box we
+returned?) is what actually answers "did we point at the right thing", and **bloat**
+(located area ÷ gold area) guards the opposite failure — a box swollen to half the page
+would score perfect coverage while being useless in a review console.
