@@ -100,6 +100,11 @@ exclude = ["(^|/)tests(/|$)"]
 
 # (tests are excluded from mypy above; pytest owns them)
 
+[[tool.mypy.overrides]]
+# rapidocr ships no type information; its results are normalized at the adapter boundary.
+module = ["rapidocr_onnxruntime", "rapidocr_onnxruntime.*"]
+ignore_missing_imports = true
+
 # ---------------------------------------------------------------------------
 # pytest + coverage
 # ---------------------------------------------------------------------------
