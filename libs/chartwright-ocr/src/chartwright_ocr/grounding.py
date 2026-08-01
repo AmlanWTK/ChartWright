@@ -26,7 +26,10 @@ def normalize(text: str) -> str:
     """Noise-tolerant canonical form: lowercase, collapse spaces, strip most punctuation."""
     text = text.lower()
     text = re.sub(r"[^\w./:\-@ ]+", "", text)  # keep chars meaningful in IDs/dates/phones
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    # Punctuation is only meaningful *inside* a token ("03/14/1985", "14:30", "a-1");
+    # at a token edge it is label noise ("Member ID:") and must not defeat a match.
+    return " ".join(w.strip("./:-@") for w in text.split())
 
 
 def similarity(a: str, b: str) -> float:
@@ -69,17 +72,13 @@ def locate_value(page: PageOcr, value: str, *, min_score: float = 0.75) -> Groun
             candidate = " ".join(t.text for t in window)
             score = similarity(candidate, value)
             if score >= min_score and (best is None or score > best.score):
-                best = GroundingMatch(
-                    bbox=_envelope(window), matched_text=candidate, score=score
-                )
+                best = GroundingMatch(bbox=_envelope(window), matched_text=candidate, score=score)
         if best is not None and best.score >= 0.999:
             break  # cannot beat an exact match
     return best
 
 
-def verify_at(
-    page: PageOcr, value: str, claimed: BoundingBox, *, min_score: float = 0.75
-) -> bool:
+def verify_at(page: PageOcr, value: str, claimed: BoundingBox, *, min_score: float = 0.75) -> bool:
     """Does ``value`` actually appear within/near the ``claimed`` region?
 
     Used to audit third-party claims (e.g. a VLM extractor asserting a location in
@@ -89,12 +88,8 @@ def verify_at(
     if not overlapping:
         return False
     region_text = " ".join(t.text for t in overlapping)
-    return similarity(region_text, value) >= min_score or normalize(value) in normalize(
-        region_text
-    )
+    return similarity(region_text, value) >= min_score or normalize(value) in normalize(region_text)
 
 
 def _overlaps(a: BoundingBox, b: BoundingBox) -> bool:
-    return not (
-        a.x + a.w < b.x or b.x + b.w < a.x or a.y + a.h < b.y or b.y + b.h < a.y
-    )
+    return not (a.x + a.w < b.x or b.x + b.w < a.x or a.y + a.h < b.y or b.y + b.h < a.y)

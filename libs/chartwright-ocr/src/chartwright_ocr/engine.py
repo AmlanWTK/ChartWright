@@ -13,9 +13,8 @@ import io
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from PIL import Image
-
 from chartwright_schemas import BoundingBox
+from PIL import Image
 
 
 @dataclass(frozen=True)

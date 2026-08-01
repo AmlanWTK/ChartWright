@@ -18,9 +18,9 @@ splits the job: **RapidOCR** (pip-installable ONNX PaddleOCR, CPU, real boxes) a
 ```python
 from chartwright_ocr import RapidOcrEngine, locate_value, verify_at
 
-page = RapidOcrEngine().recognize(png_bytes)      # tokens in reading order, with boxes
-match = locate_value(page, "A1234567")            # -> GroundingMatch(bbox, score) | None
-ok = verify_at(page, "A1234567", claimed_bbox)    # audit a third-party location claim
+page = RapidOcrEngine().recognize(png_bytes)  # tokens in reading order, with boxes
+match = locate_value(page, "A1234567")  # -> GroundingMatch(bbox, score) | None
+ok = verify_at(page, "A1234567", claimed_bbox)  # audit a third-party location claim
 ```
 
 - `locate_value` — fuzzy (OCR-noise-tolerant), spans up to 4 adjacent tokens, returns

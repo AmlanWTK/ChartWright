@@ -33,10 +33,8 @@ class CircuitBreaker:
         opened = self._opened_at.get(provider)
         if opened is None:
             return False
-        if time.monotonic() - opened >= self._cooldown:
-            # Half-open: allow a probe attempt; a success will close it.
-            return False
-        return True
+        # Half-open: allow a probe attempt; a success will close it.
+        return time.monotonic() - opened < self._cooldown
 
     def record_failure(self, provider: str) -> None:
         self._failures[provider] += 1

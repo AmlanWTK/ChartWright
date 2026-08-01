@@ -8,7 +8,6 @@ import uuid
 
 import httpx
 import pytest
-
 from chartwright_gateway import (
     GatewaySettings,
     ModelGateway,

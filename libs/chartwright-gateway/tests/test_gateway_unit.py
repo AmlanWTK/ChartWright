@@ -5,12 +5,10 @@ per-tenant metering, cache-key content sensitivity, and error surfacing.
 """
 
 import pytest
-
 from chartwright_gateway import (
     AllProvidersFailedError,
     CircuitBreaker,
     InMemoryCache,
-    Meter,
     MockProvider,
     ModelGateway,
     ModelRequest,
@@ -64,7 +62,9 @@ class TestFailover:
         assert result.text == "SERVED_BY_GOOD"
 
     def test_all_providers_failing_raises_with_attempt_trail(self) -> None:
-        gw = ModelGateway({0: [MockProvider(name="a", fail=True), MockProvider(name="b", fail=True)]})
+        gw = ModelGateway(
+            {0: [MockProvider(name="a", fail=True), MockProvider(name="b", fail=True)]}
+        )
         with pytest.raises(AllProvidersFailedError) as exc:
             gw.generate(_req())
         assert exc.value.attempts == ["a(failed)", "b(failed)"]

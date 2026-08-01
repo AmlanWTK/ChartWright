@@ -90,6 +90,8 @@ mypy_path = [
     "libs/chartwright-db/src",
     "libs/chartwright-events/src",
     "libs/chartwright-synthdata/src",
+    "libs/chartwright-gateway/src",
+    "libs/chartwright-ocr/src",
     "services/hello/src",
     "services/ingestion/src",
     "services/pipeline/src",

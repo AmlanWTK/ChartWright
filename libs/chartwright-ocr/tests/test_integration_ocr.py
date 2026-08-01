@@ -7,7 +7,6 @@ This is the in-repo slice of the CP12 gate; the full sliced eval is scripts/eval
 import io
 
 import pytest
-
 from chartwright_ocr import RapidOcrEngine, locate_value, verify_at
 from chartwright_synthdata import generate_prior_auth
 
@@ -44,9 +43,7 @@ class TestCleanPageRecognition:
     def test_verifier_confirms_gold_locations(self, recognized) -> None:  # type: ignore[no-untyped-def]
         doc, page = recognized
         confirmed = sum(
-            1
-            for f in doc.labels.fields
-            if verify_at(page, f.value_raw, f.provenance.bbox)
+            1 for f in doc.labels.fields if verify_at(page, f.value_raw, f.provenance.bbox)
         )
         assert confirmed / len(doc.labels.fields) >= 0.85
 
