@@ -32,9 +32,9 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP07 | Identity, secrets & baseline security controls | CP05 | ⬜ |
 | CP08 | Data model & persistence layer (Postgres, RLS, audit) | CP04-L, CP03 | ✅ Done |
 | CP09 | Object storage & document intake service | CP08 (CP07 deferred: dev tenant header) | ✅ Done |
-| CP10 | Workflow orchestration (Temporal) & event backbone (Kafka) | CP09 (CP06 observability deferred per ADR-0007) | 🔵 In review |
-| CP11 | Model Gateway (router, provider abstraction, metering) | CP10 | ⬜ |
-| CP12 | GPU serving (vLLM) & Tier-0 OCR VLM + grounding | CP11 | ⬜ |
+| CP10 | Workflow orchestration (Temporal) & event backbone (Kafka) | CP09 (CP06 observability deferred per ADR-0007) | ✅ Done — **Milestone 1 complete** |
+| CP11 | Model Gateway (router, provider abstraction, metering) — Ollama local per ADR-0008 | CP10 | ✅ Done |
+| CP12 | Tier-0 OCR + grounding contract (RapidOCR local; vLLM/GPU deferred to cloud re-entry) | CP11 | 🔵 In review |
 | CP13 | Preprocessing, normalization & packet splitting | CP12 | ⬜ |
 | CP14 | Document classification | CP13 | ⬜ |
 | CP15 | Structured extraction (grounded, schema-constrained) | CP14 | ⬜ |
@@ -67,4 +67,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01–CP09 done (CP04→CP07 partially deferred per ADR-0007) · CP10 in review — **completes Milestone 1 (walking skeleton)** · 6/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP08: **CP09 — object storage & document intake service** (MinIO + ingestion API).
+**Current progress:** CP01–CP10 done (CP04→CP07 partially deferred per ADR-0007) — **Milestone 1 (walking skeleton) COMPLETE**: a document uploads via API, flows through Kafka → Temporal → nine durable audited stages to COMPLETED, survives worker kills, dedupes, quarantines, and replays. Next: **CP11 — Model Gateway** (Phase D, the AI core begins) · 7/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before CP12 (GPU serving). Next after CP08: **CP09 — object storage & document intake service** (MinIO + ingestion API).

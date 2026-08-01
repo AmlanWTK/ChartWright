@@ -1,0 +1,22 @@
+[project]
+name = "chartwright-ocr"
+version = "0.1.0"
+description = "Tier-0 OCR (CP12): engine protocol, RapidOCR adapter, grounded page assembly, grounding verifier (ADR-0003)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chartwright-schemas",
+    "rapidocr-onnxruntime>=1.3.24",
+    "pillow>=10.4.0",
+    "numpy>=1.26.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chartwright_ocr"]
+
+[tool.uv.sources]
+chartwright-schemas = { workspace = true }
