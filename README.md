@@ -2,7 +2,7 @@
 
 **Autonomous Clinical Document Intelligence Platform** — a VLM-native system that turns unstructured clinical documents (prior-authorization packets, referrals, EOBs, lab reports, faxed orders) into structured, source-grounded, FHIR-aligned data, and drafts the next action with a human in the loop.
 
-> **Status:** Pre-implementation. We are building checkpoint-by-checkpoint against the plan in [`docs/ROADMAP.md`](docs/ROADMAP.md). This repository currently contains **Checkpoint 1 (CP01) deliverables**: the project charter, architecture decision records, C4 diagrams, requirements traceability, an initial threat model, and team working agreements. No application code yet — that begins at CP02.
+> **Status:** Active development, building checkpoint-by-checkpoint against the plan in [`docs/ROADMAP.md`](docs/ROADMAP.md). CP01–CP12 are complete (11/34) — Milestone 1 (walking skeleton) is done, and Tier-0 OCR with an enforced, CI-gated grounding contract is live. Next: **CP13 — Preprocessing, normalization & packet splitting**.
 
 ---
 
@@ -47,7 +47,9 @@ One checkpoint at a time. Each is specified, approved, implemented, tested again
 
 ## Current checkpoint
 
-**CP12 — Tier-0 OCR & the Grounding Contract.** `libs/chartwright-ocr`: RapidOCR (pip-only ONNX, CPU, real per-token bounding boxes) behind an `OcrEngine` protocol, tokens assembled in reading order, and the ADR-0003 grounding mechanics live: `locate_value` finds a value's physical evidence or returns None (never invents coordinates), `verify_at` audits location claims — the anti-hallucination check that will police VLM extractor output in CP15. Measured against pixel-accurate synthetic gold labels per degradation slice: `uv run python scripts/eval_ocr.py` (gate: clean-slice field recall ≥ 90%).
+**CP13 — Preprocessing, normalization & packet splitting.** Not yet started.
+
+Previously completed — **CP12 — Tier-0 OCR & the Grounding Contract.** `libs/chartwright-ocr`: RapidOCR (pip-only ONNX, CPU, real per-token bounding boxes) behind an `OcrEngine` protocol, tokens assembled in reading order, and the ADR-0003 grounding mechanics live: `locate_value` finds a value's physical evidence or returns None (never invents coordinates), `verify_at` audits location claims — the anti-hallucination check that will police VLM extractor output in CP15. Measured against pixel-accurate synthetic gold labels per degradation slice (`uv run python scripts/eval_ocr.py`), gating on clean-slice recall (≥ 90%), grounding coverage (≥ 0.95), and box bloat (≤ 2.5); the script exits non-zero on failure so it gates CI directly. Degradation slices are calibrated so `fax`/`bad_fax` actually stress the engine (measured baseline: clean 100% / fax ~99% / bad_fax ~79–89% recall) — that gap is CP17's escalation-cascade baseline. Hallucination-rate measurement (locate_value correctly refusing absent values) is scheduled for CP26 per ADR-0003; currently covered by unit test only.
 
 Previously completed — **CP11 — Model Gateway (Phase D: the AI core begins).** `libs/chartwright-gateway`: every model call in the system goes through `ModelGateway.generate()` — per-tier provider chains with failover, content-hash response caching (identical request never hits an engine twice), circuit breaking (dead engines get skipped, not waited on), and per-tenant metering (the future dashboard's data feed). Local engine: **Ollama** (`ollama pull moondream`) per ADR-0008 — zero cost, provider-swappable via the `ModelProvider` protocol; the frontier tier is a labeled mock until an API key is configured.
 
