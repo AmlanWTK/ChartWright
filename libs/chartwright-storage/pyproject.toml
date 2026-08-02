@@ -1,0 +1,16 @@
+[project]
+name = "chartwright-storage"
+version = "0.1.0"
+description = "Shared S3-compatible object storage client (CP13): extracted from services/ingestion so services/pipeline can share it without a service-to-service dependency (ADR-0009)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.34.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chartwright_storage"]

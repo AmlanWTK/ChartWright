@@ -16,6 +16,7 @@ from chartwright_db.models import (
 from chartwright_db.repository import (
     DocumentRepository,
     ExtractionRepository,
+    NormalizedPageInput,
     ReviewTaskRepository,
 )
 from chartwright_db.session import (
@@ -37,6 +38,7 @@ __all__ = [
     "ExtractedTable",
     "Extraction",
     "ExtractionRepository",
+    "NormalizedPageInput",
     "ReviewTask",
     "ReviewTaskRepository",
     "Tenant",

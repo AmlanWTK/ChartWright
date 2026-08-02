@@ -11,6 +11,7 @@ The worker runs IN-PROCESS on a unique task queue per test run, so tests are
 self-contained and don't collide with a separately running `python -m pipeline.worker`.
 """
 
+import io
 import uuid
 
 import pytest
@@ -24,7 +25,10 @@ from chartwright_db import (
     tenant_context,
 )
 from chartwright_events import LoggingEventPublisher
+from chartwright_storage import ObjectStorage
+from chartwright_synthdata import generate_prior_auth
 from pipeline.activities import PipelineActivities
+from pipeline.config import get_pipeline_settings
 from pipeline.workflows import DocumentPipelineWorkflow, PipelineInput
 from sqlalchemy import select, text
 from temporalio.client import Client
@@ -58,11 +62,32 @@ async def temporal_client():  # type: ignore[no-untyped-def]
         pytest.skip("Temporal not reachable (make local-up)")
 
 
+def _object_storage() -> ObjectStorage:
+    # Same s3_* defaults as ingestion.config.Settings — same CP04-L MinIO container.
+    return ObjectStorage(get_pipeline_settings())
+
+
 def _make_received_doc(engine, tenant_id: uuid.UUID, external_ref: str | None = None) -> str:  # type: ignore[no-untyped-def]
+    """A RECEIVED document with a real stored original — CP13's NORMALIZED stage now
+    does real work (rasterize + normalize + split), so every fixture document needs an
+    actual object in storage, exactly like CP09 ingestion always provides in production.
+    """
+    storage = _object_storage()
     with tenant_context(engine, tenant_id) as s:
-        doc = DocumentRepository(s, actor="cp10-test").create_document(
+        repo = DocumentRepository(s, actor="cp10-test")
+        doc = repo.create_document(
             source_channel="api", content_hash=uuid.uuid4().hex, external_ref=external_ref
         )
+        generated = generate_prior_auth(seed=doc.id.int % (2**32), document_id=str(doc.id))
+        buf = io.BytesIO()
+        generated.image.convert("RGB").save(buf, format="PNG")
+        try:
+            key = storage.put_original(
+                tenant_id=tenant_id, document_id=doc.id, data=buf.getvalue(), extension=".png"
+            )
+        except Exception:  # pragma: no cover
+            pytest.skip("MinIO not reachable (make local-up)")
+        doc.original_object_key = key
         return str(doc.id)
 
 

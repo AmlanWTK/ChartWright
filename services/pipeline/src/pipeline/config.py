@@ -15,6 +15,14 @@ class PipelineSettings(BaseSettings):
     kafka_bootstrap: str = "localhost:9092"
     trigger_group_id: str = "chartwright-pipeline-trigger"
 
+    # Object storage (S3-compatible; MinIO locally, S3 in prod). Defaults match
+    # ingestion.config.Settings exactly — same CP04-L MinIO container, same bucket.
+    s3_endpoint: str = "http://localhost:9000"
+    s3_access_key: str = "chartwright"  # dev-only default (CP04-L MinIO)
+    s3_secret_key: str = "chartwright_dev"  # noqa: S105
+    s3_bucket: str = "chartwright-documents"
+    s3_region: str = "us-east-1"
+
     # Retry knobs (small defaults keep integration tests fast; prod raises them via env).
     stage_max_attempts: int = 3
     stage_backoff_seconds: float = 0.2

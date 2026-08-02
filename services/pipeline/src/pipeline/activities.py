@@ -15,11 +15,26 @@ exercising the FAILED + DLQ path end-to-end.
 
 from __future__ import annotations
 
+import io
 import uuid
 from dataclasses import dataclass
 
-from chartwright_db import DocumentRepository, build_engine, tenant_context
+from chartwright_db import (
+    Document,
+    DocumentRepository,
+    NormalizedPageInput,
+    build_engine,
+    tenant_context,
+)
 from chartwright_events import EventPublisher, publisher_from_env
+from chartwright_preprocess import (
+    HeuristicSplitter,
+    file_type_from_extension,
+    load_pages,
+    normalize_page,
+)
+from chartwright_storage import ObjectStorage
+from pipeline.config import PipelineSettings, get_pipeline_settings
 from temporalio import activity
 
 # Lifecycle order — used to decide "already past this stage" for idempotent re-runs.
@@ -60,9 +75,17 @@ class PoisonedDocumentError(Exception):
 class PipelineActivities:
     """Activity implementations bound to a DB engine + event publisher."""
 
-    def __init__(self, publisher: EventPublisher | None = None):
+    def __init__(
+        self,
+        publisher: EventPublisher | None = None,
+        *,
+        storage: ObjectStorage | None = None,
+        settings: PipelineSettings | None = None,
+    ):
         self._engine = build_engine()
         self._publisher = publisher or publisher_from_env()
+        self._settings = settings or get_pipeline_settings()
+        self._storage = storage or ObjectStorage(self._settings)
 
     @activity.defn
     def advance_stage(self, input: StageInput) -> str:
@@ -86,8 +109,59 @@ class PipelineActivities:
             if current_idx >= target_idx:
                 return doc.status  # idempotent re-run: already there or past it
 
+            if input.to_status == "NORMALIZED":
+                self._normalize_document(repo, tenant_id, doc)
+
             repo.transition_status(doc_id, input.to_status)
             return input.to_status
+
+    def _normalize_document(
+        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
+    ) -> None:
+        """CP13: rasterize the stored original, correct page geometry, split into
+        packets, and persist both — all pixel-only, no model calls (see
+        chartwright_preprocess). Structural-signal packet splitting is deliberate:
+        neither classification (CP14) nor OCR (CP12) has run yet at this point in
+        STATUS_ORDER, so this is the earliest stage that *can* split reliably.
+        """
+        original_key = doc.original_object_key
+        if original_key is None:
+            msg = f"document {doc.id} has no original_object_key; cannot normalize"
+            raise RuntimeError(msg)
+
+        extension = "." + original_key.rsplit(".", 1)[-1]
+        file_type = file_type_from_extension(extension)
+        data = self._storage.get(original_key)
+        pages = load_pages(data, file_type)
+        # Computed once and reused below for both storage and splitting — normalize_page's
+        # skew search is the expensive part of this stage; never run it twice per page.
+        normalized_pages = [normalize_page(page) for page in pages]
+
+        page_inputs: list[NormalizedPageInput] = []
+        for i, normalized in enumerate(normalized_pages, start=1):
+            buf = io.BytesIO()
+            normalized.image.save(buf, format="PNG")
+            key = self._storage.put_normalized_page(
+                tenant_id=tenant_id, document_id=doc.id, page_number=i, data=buf.getvalue()
+            )
+            page_inputs.append(
+                NormalizedPageInput(
+                    page_number=i,
+                    width=normalized.image.width,
+                    height=normalized.image.height,
+                    image_object_key=key,
+                )
+            )
+
+        manifest_key = f"tenants/{tenant_id}/documents/{doc.id}/normalized/"
+        repo.record_normalized_pages(doc.id, page_inputs, normalized_object_key=manifest_key)
+
+        packets = HeuristicSplitter().split([p.image for p in normalized_pages])
+        repo.record_packet_split(
+            doc.id,
+            packet_count=len(packets),
+            boundaries=[list(p.page_indices) for p in packets],
+        )
 
     @activity.defn
     def mark_failed(self, input: FailInput) -> None:

@@ -7,6 +7,7 @@ if the change commits, its audit trail commits with it (and vice versa).
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
@@ -15,10 +16,23 @@ from sqlalchemy.orm import Session
 from chartwright_db.models import (
     AuditLog,
     Document,
+    DocumentPage,
     ExtractedField,
     Extraction,
     ReviewTask,
 )
+
+
+@dataclass(frozen=True)
+class NormalizedPageInput:
+    """One CP13-normalized page, ready to persist — mirrors the DocumentPage columns
+    that stage actually populates (quality_score/model_tier_used are set later, by the
+    routing logic those columns already exist for)."""
+
+    page_number: int
+    width: int
+    height: int
+    image_object_key: str
 
 
 def _snapshot(obj: object, keys: tuple[str, ...]) -> dict[str, Any]:
@@ -121,6 +135,73 @@ class DocumentRepository(_AuditedRepository):
 
     def get(self, document_id: uuid.UUID) -> Document | None:
         return self.session.get(Document, document_id)
+
+    def record_normalized_pages(
+        self,
+        document_id: uuid.UUID,
+        pages: list[NormalizedPageInput],
+        *,
+        normalized_object_key: str,
+    ) -> Document:
+        """CP13: persist normalized page rows and point the document at the manifest.
+        Idempotent re-run safe: an existing (document_id, page_number) row is updated in
+        place rather than duplicated, per the unique index on that pair."""
+        doc = self.session.get_one(Document, document_id)
+        before = _snapshot(doc, self._DOC_SNAPSHOT)
+
+        existing = {
+            p.page_number: p
+            for p in self.session.execute(
+                select(DocumentPage).where(DocumentPage.document_id == document_id)
+            ).scalars()
+        }
+        for page in pages:
+            row = existing.get(page.page_number)
+            if row is None:
+                self.session.add(
+                    DocumentPage(
+                        tenant_id=self._tenant_id(),
+                        document_id=document_id,
+                        page_number=page.page_number,
+                        width=page.width,
+                        height=page.height,
+                        image_object_key=page.image_object_key,
+                    )
+                )
+            else:
+                row.width = page.width
+                row.height = page.height
+                row.image_object_key = page.image_object_key
+
+        doc.normalized_object_key = normalized_object_key
+        doc.page_count = len(pages)
+        self.session.flush()
+        self._audit(
+            "normalize",
+            "document",
+            doc.id,
+            before=before,
+            after=_snapshot(doc, self._DOC_SNAPSHOT),
+        )
+        return doc
+
+    def record_packet_split(
+        self,
+        document_id: uuid.UUID,
+        *,
+        packet_count: int,
+        boundaries: list[list[int]],
+    ) -> None:
+        """CP13: audit-log the structural packet split. No schema change — the packet
+        table lands with CP14/CP15 once classification exists to assign a doc_type per
+        packet (see docs/CP13-preprocessing-packet-splitting.md, "deferred to a later
+        checkpoint"); until then this is the split's system of record."""
+        self._audit(
+            "packet_split",
+            "document",
+            document_id,
+            after={"packet_count": packet_count, "boundaries": boundaries},
+        )
 
     def list_by_status(self, status: str, *, limit: int = 100) -> list[Document]:
         return list(
