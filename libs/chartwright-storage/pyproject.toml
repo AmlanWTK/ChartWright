@@ -5,7 +5,7 @@ description = "Shared S3-compatible object storage client (CP13): extracted from
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "boto3>=1.34.0",
+    "boto3>=1.43.68",
 ]
 
 [build-system]
