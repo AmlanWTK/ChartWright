@@ -23,6 +23,7 @@ from chartwright_classify import classify_packet
 from chartwright_db import (
     Document,
     DocumentRepository,
+    ExtractionRepository,
     NormalizedPageInput,
     build_engine,
     tenant_context,
@@ -36,13 +37,13 @@ from chartwright_ocr import (
     page_ocr_from_json,
     page_ocr_to_json,
 )
-from chartwright_schemas.taxonomy import DocType
 from chartwright_preprocess import (
     HeuristicSplitter,
     file_type_from_extension,
     load_pages,
     normalize_page,
 )
+from chartwright_schemas.taxonomy import DocType
 from chartwright_storage import ObjectStorage
 from PIL import Image
 from pipeline.config import PipelineSettings, get_pipeline_settings
@@ -133,7 +134,11 @@ class PipelineActivities:
             elif input.to_status == "OCR_DONE":
                 self._ocr_document(repo, tenant_id, doc)
             elif input.to_status == "EXTRACTED":
-                self._extract_document(repo, tenant_id, doc)
+                # Same session as `repo`, so CP08's audit-in-the-same-transaction
+                # guarantee still holds across both repositories.
+                self._extract_document(
+                    ExtractionRepository(session, actor="pipeline-worker"), tenant_id, doc
+                )
 
             repo.transition_status(doc_id, input.to_status)
             return input.to_status
@@ -216,9 +221,7 @@ class PipelineActivities:
             doc.id, doc_type=result.doc_type.value, confidence=result.confidence
         )
 
-    def _ocr_document(
-        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
-    ) -> None:
+    def _ocr_document(self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document) -> None:
         """CP15, completing CP12's pipeline integration.
 
         CP12 built libs/chartwright-ocr and its eval but never wired the stage, so
@@ -236,10 +239,7 @@ class PipelineActivities:
         for page_number in range(1, doc.page_count + 1):
             page = repo.get_page(doc.id, page_number)
             if page is None or page.image_object_key is None:
-                msg = (
-                    f"document {doc.id} page {page_number} has no normalized image; "
-                    "cannot OCR"
-                )
+                msg = f"document {doc.id} page {page_number} has no normalized image; cannot OCR"
                 raise RuntimeError(msg)
             recognized = self._ocr_engine.recognize(self._storage.get(page.image_object_key))
             self._storage.put_ocr_page(
@@ -250,7 +250,7 @@ class PipelineActivities:
             )
 
     def _extract_document(
-        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
+        self, extractions: ExtractionRepository, tenant_id: uuid.UUID, doc: Document
     ) -> None:
         """CP15: pull the schema's fields off the page, each one grounded (ADR-0003/0011).
 
@@ -281,14 +281,14 @@ class PipelineActivities:
             str(doc.id),
             doc_type_confidence=doc.doc_type_confidence or 0.0,
         )
-        extraction = repo.create_extraction(
+        extraction = extractions.create_extraction(
             document_id=doc.id,
             doc_type=result.doc_type.value,
             schema_version=result.schema_version,
             overall_confidence=result.overall_confidence,
         )
         for field in result.fields:
-            repo.add_field(
+            extractions.add_field(
                 extraction_id=extraction.id,
                 field_key=field.key,
                 value_raw=field.value_raw,

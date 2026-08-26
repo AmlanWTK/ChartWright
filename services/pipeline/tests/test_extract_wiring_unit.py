@@ -83,13 +83,21 @@ class FakePage:
 
 
 class FakeRepo:
+    """Stands in for DocumentRepository (page lookup only)."""
+
     def __init__(self, pages: dict[int, FakePage | None]) -> None:
         self._pages = pages
-        self.extractions: list[tuple[str, float | None]] = []
-        self.fields: list[tuple[str, str, int]] = []
 
     def get_page(self, document_id: uuid.UUID, page_number: int) -> FakePage | None:
         return self._pages.get(page_number)
+
+
+class FakeExtractions:
+    """Stands in for ExtractionRepository -- a genuinely separate CP08 repository."""
+
+    def __init__(self) -> None:
+        self.extractions: list[tuple[str, float | None]] = []
+        self.fields: list[tuple[str, str, int]] = []
 
     def create_extraction(
         self, *, document_id, doc_type: str, schema_version: str, overall_confidence=None
@@ -163,25 +171,25 @@ class TestExtractStage:
         key = ObjectStorage.ocr_page_key(tenant_id=TENANT, document_id=DOC_ID, page_number=1)
         storage = FakeStorage({key: page_ocr_to_json(_form_page())})
         acts = _acts(storage)
-        repo = FakeRepo({1: FakePage("norm/p1")})
+        extractions = FakeExtractions()
 
-        acts._extract_document(repo, TENANT, _doc())
+        acts._extract_document(extractions, TENANT, _doc())
 
-        assert repo.extractions == [("prior_auth_request", pytest.approx(0.95, abs=0.05))]
-        assert ("member_id", "A21743360", 1) in repo.fields
+        assert extractions.extractions == [("prior_auth_request", pytest.approx(0.95, abs=0.05))]
+        assert ("member_id", "A21743360", 1) in extractions.fields
 
     def test_unclassified_document_is_a_hard_error(self) -> None:
         acts = _acts(FakeStorage())
         with pytest.raises(RuntimeError, match="without a doc_type"):
-            acts._extract_document(FakeRepo({}), TENANT, _doc(doc_type=None))
+            acts._extract_document(FakeExtractions(), TENANT, _doc(doc_type=None))
 
     def test_fields_the_page_does_not_support_are_absent(self) -> None:
         key = ObjectStorage.ocr_page_key(tenant_id=TENANT, document_id=DOC_ID, page_number=1)
         storage = FakeStorage({key: page_ocr_to_json(_form_page())})
         acts = _acts(storage)
-        repo = FakeRepo({1: FakePage("norm/p1")})
+        extractions = FakeExtractions()
 
-        acts._extract_document(repo, TENANT, _doc())
+        acts._extract_document(extractions, TENANT, _doc())
 
-        keys = {k for k, _, _ in repo.fields}
+        keys = {k for k, _, _ in extractions.fields}
         assert "procedure_code" not in keys  # nothing on this page supports it
