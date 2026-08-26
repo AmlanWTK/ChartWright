@@ -19,6 +19,7 @@ import io
 import uuid
 from dataclasses import dataclass
 
+from chartwright_classify import classify_packet
 from chartwright_db import (
     Document,
     DocumentRepository,
@@ -27,6 +28,7 @@ from chartwright_db import (
     tenant_context,
 )
 from chartwright_events import EventPublisher, publisher_from_env
+from chartwright_gateway import ModelGateway, build_default_gateway
 from chartwright_preprocess import (
     HeuristicSplitter,
     file_type_from_extension,
@@ -34,6 +36,7 @@ from chartwright_preprocess import (
     normalize_page,
 )
 from chartwright_storage import ObjectStorage
+from PIL import Image
 from pipeline.config import PipelineSettings, get_pipeline_settings
 from temporalio import activity
 
@@ -81,11 +84,13 @@ class PipelineActivities:
         *,
         storage: ObjectStorage | None = None,
         settings: PipelineSettings | None = None,
+        gateway: ModelGateway | None = None,
     ):
         self._engine = build_engine()
         self._publisher = publisher or publisher_from_env()
         self._settings = settings or get_pipeline_settings()
         self._storage = storage or ObjectStorage(self._settings)
+        self._gateway = gateway or build_default_gateway()
 
     @activity.defn
     def advance_stage(self, input: StageInput) -> str:
@@ -111,6 +116,8 @@ class PipelineActivities:
 
             if input.to_status == "NORMALIZED":
                 self._normalize_document(repo, tenant_id, doc)
+            elif input.to_status == "CLASSIFIED":
+                self._classify_document(repo, tenant_id, doc)
 
             repo.transition_status(doc_id, input.to_status)
             return input.to_status
@@ -161,6 +168,36 @@ class PipelineActivities:
             doc.id,
             packet_count=len(packets),
             boundaries=[list(p.page_indices) for p in packets],
+        )
+
+    def _classify_document(
+        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
+    ) -> None:
+        """CP14: classify from the document's first normalized page only (approved
+        scope — see docs/CP14-document-classification.md). Packet splitting (CP13)
+        partitions contiguously from page index 0, so the document's first normalized
+        page is always the first page of its first packet; no need to re-read CP13's
+        packet-split audit entry just to find it.
+
+        First model call in the pipeline (CP12/CP13 are both deterministic). The model
+        describes the page in free text and chartwright_classify maps that description
+        onto a DocType in deterministic code (ADR-0010); confidence is derived from how
+        unambiguous the description was, and is explicitly UNCALIBRATED — see that
+        library's README. Never raises on a malformed model response
+        (classify_packet's own OTHER-fallback handles that); a missing first page,
+        however, is a real bug (NORMALIZED must have already produced one) and does
+        raise, same discipline as _normalize_document's original_object_key guard.
+        """
+        first_page = repo.get_page(doc.id, 1)
+        if first_page is None or first_page.image_object_key is None:
+            msg = f"document {doc.id} has no normalized first page; cannot classify"
+            raise RuntimeError(msg)
+
+        data = self._storage.get(first_page.image_object_key)
+        image = Image.open(io.BytesIO(data)).convert("RGB")
+        result = classify_packet(image, gateway=self._gateway, tenant_id=str(tenant_id))
+        repo.record_classification(
+            doc.id, doc_type=result.doc_type.value, confidence=result.confidence
         )
 
     @activity.defn

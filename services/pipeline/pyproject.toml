@@ -9,6 +9,8 @@ dependencies = [
     "chartwright-events",
     "chartwright-preprocess",
     "chartwright-storage",
+    "chartwright-classify",
+    "chartwright-gateway",
     "temporalio>=1.7.0",
     "confluent-kafka>=2.5.0",
     "pydantic-settings>=2.4.0",
@@ -26,3 +28,5 @@ chartwright-db = { workspace = true }
 chartwright-events = { workspace = true }
 chartwright-preprocess = { workspace = true }
 chartwright-storage = { workspace = true }
+chartwright-classify = { workspace = true }
+chartwright-gateway = { workspace = true }

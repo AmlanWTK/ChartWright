@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,6 +28,14 @@ class ModelRequest(BaseModel):
     purpose: str = "general"  # ocr | classify | extract | ... (telemetry dimension)
     max_tokens: int = 1024
     temperature: float = 0.0  # deterministic by default (ADR-0005 discipline)
+    # Optional JSON Schema constraining the response shape (Ollama's structured-output
+    # mode). Added during CP14, whose classifier no longer uses it: constrained decoding
+    # guarantees a schema-VALID response, which turned out to mask a model producing
+    # meaningless CONTENT (28.3% accuracy, every miss well-formed — see ADR-0010).
+    # Retained for CP15's schema-constrained extraction, with that caveat attached:
+    # schema-valid output is not evidence of correct output, and must still be checked
+    # against CP12's grounding verification. Currently has no consumer.
+    response_format: dict[str, object] | None = None
 
     def cache_key(self, model: str) -> str:
         """Content-hash key: identical request + model → identical cached response."""
@@ -36,6 +45,8 @@ class ModelRequest(BaseModel):
         for img in self.images:
             h.update(hashlib.sha256(img).digest())
         h.update(f"{self.max_tokens}|{self.temperature}".encode())
+        if self.response_format is not None:
+            h.update(json.dumps(self.response_format, sort_keys=True).encode())
         return f"gw:{h.hexdigest()}"
 
     def images_b64(self) -> list[str]:

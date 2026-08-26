@@ -4,6 +4,7 @@ Each skips cleanly if its dependency isn't running, with instructions in the ski
 message — so `pytest -m integration` stays honest about what was actually proven.
 """
 
+import base64
 import uuid
 
 import httpx
@@ -30,8 +31,28 @@ def _ollama_ready(settings: GatewaySettings) -> bool:
     return any(settings.ollama_model in name for name in models)
 
 
+# A 128x128 PNG: a black square on white. Embedded as a literal so this test needs no
+# imaging library -- chartwright-gateway deliberately depends on none, taking raw bytes.
+_TEST_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAAAAADmVT4XAAAAbUlEQVR42u3bMQoAMAgDQC39"
+    "/5ftC7oJFnpZHXLgnKyYzQoAAAAAAAAAAAAAgOHs2yGbi8oLAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAABeBaSdEQAAAAAAAAAAAMD3gAMvYQP/J9C/LgAAAABJRU5E"
+    "rkJggg=="
+)
+
+
 class TestOllamaLive:
-    def test_generate_text_via_local_model(self) -> None:
+    def test_generate_via_local_model(self) -> None:
+        """The Tier-0 adapter round-trips against a live Ollama server.
+
+        Sends an image, because the default Tier-0 model (moondream) is vision-only:
+        given a text-only prompt it emits end-of-sequence immediately and returns an
+        empty string (observed during CP14 verification -- eval_count=1). That is
+        correct behavior for the model, not a fault in the adapter, so a text-only
+        prompt proves nothing here. This test previously asserted non-empty text from
+        a text-only prompt and had never actually run: Ollama was not installed until
+        CP14, so it skipped silently through the whole of CP11.
+        """
         settings = GatewaySettings()
         if not _ollama_ready(settings):
             pytest.skip(
@@ -41,17 +62,18 @@ class TestOllamaLive:
         gw = ModelGateway(
             {0: [OllamaProvider(base_url=settings.ollama_url, model=settings.ollama_model)]}
         )
-        result = gw.generate(
-            ModelRequest(prompt="Reply with exactly the word: PONG", tenant_id="itest")
+        request = ModelRequest(
+            prompt="Describe this image.", images=(_TEST_PNG,), tenant_id="itest"
         )
-        assert result.text.strip() != ""
+        result = gw.generate(request)
         assert result.provider.startswith("ollama:")
         assert result.latency_ms > 0
+        # tokens_in > 0 proves the server actually evaluated our prompt + image, which
+        # a broken adapter (or a silently-dropped image) could not fake.
+        assert result.tokens_in is not None and result.tokens_in > 0
+        assert result.text.strip() != ""
         # And the cache makes the second call effectively free:
-        again = gw.generate(
-            ModelRequest(prompt="Reply with exactly the word: PONG", tenant_id="itest")
-        )
-        assert again.cached is True
+        assert gw.generate(request).cached is True
 
 
 class TestRedisCacheLive:

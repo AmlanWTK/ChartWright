@@ -35,8 +35,8 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP10 | Workflow orchestration (Temporal) & event backbone (Kafka) | CP09 (CP06 observability deferred per ADR-0007) | ✅ Done — **Milestone 1 complete** |
 | CP11 | Model Gateway (router, provider abstraction, metering) — Ollama local per ADR-0008 | CP10 | ✅ Done |
 | CP12 | Tier-0 OCR + grounding contract (RapidOCR local; vLLM/GPU deferred to cloud re-entry) | CP11 | ✅ Done |
-| CP13 | Preprocessing, normalization & packet splitting | CP12 | ⬜ |
-| CP14 | Document classification | CP13 | ⬜ |
+| CP13 | Preprocessing, normalization & packet splitting | CP12 | ✅ Done |
+| CP14 | Document classification (describe-then-map per ADR-0010) | CP13 | ✅ Done |
 | CP15 | Structured extraction (grounded, schema-constrained) | CP14 | ⬜ |
 | CP16 | Validation, normalization & code systems | CP15 | ⬜ |
 | CP17 | Confidence calibration & escalation cascade | CP16 | ⬜ |
@@ -67,4 +67,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01–CP12 done (CP04→CP07 partially deferred per ADR-0007) — **Milestone 1 (walking skeleton) COMPLETE**, and Tier-0 OCR (CP12) is serving with the ADR-0003 grounding contract enforced and CI-gated: `scripts/eval_ocr.py` gates clean-slice recall (≥ 90%), grounding coverage (≥ 0.95), and box bloat (≤ 2.5), and exits non-zero on failure. Degradation slices are empirically calibrated so `fax`/`bad_fax` genuinely stress the engine (clean 100% / fax ~99% / bad_fax ~79–89% recall) — that gap is CP17's escalation-cascade baseline. Hallucination-rate measurement (locate_value correctly refusing absent values) is deferred to CP26 per ADR-0003. 11/34 complete. Next: **CP13 — preprocessing, normalization & packet splitting**. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) remain deferred per ADR-0007 and re-enter no later than the checkpoint that needs GPU serving.
+**Current progress:** CP01–CP14 done (CP04→CP07 partially deferred per ADR-0007) — **Milestone 1 (walking skeleton) COMPLETE**, and Phase D (AI core) underway: Tier-0 OCR with a real grounding contract (CP12), pixel-only page normalization + structural packet splitting (CP13), and document classification (CP14) all feed the pipeline with real work, verified against synthetic gates and the live local stack. Next: **CP15 — Structured extraction** · 10/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before GPU-served Tier-0 OCR.

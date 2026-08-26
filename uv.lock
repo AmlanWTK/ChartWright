@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "chartwright",
+    "chartwright-classify",
     "chartwright-db",
     "chartwright-events",
     "chartwright-gateway",
@@ -202,6 +203,23 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "ruff", specifier = ">=0.6.0" },
+]
+
+[[package]]
+name = "chartwright-classify"
+version = "0.1.0"
+source = { editable = "libs/chartwright-classify" }
+dependencies = [
+    { name = "chartwright-gateway" },
+    { name = "chartwright-schemas" },
+    { name = "pillow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chartwright-gateway", editable = "libs/chartwright-gateway" },
+    { name = "chartwright-schemas", editable = "libs/chartwright-schemas" },
+    { name = "pillow", specifier = ">=10.4.0" },
 ]
 
 [[package]]
@@ -1068,8 +1086,10 @@ name = "pipeline"
 version = "0.1.0"
 source = { editable = "services/pipeline" }
 dependencies = [
+    { name = "chartwright-classify" },
     { name = "chartwright-db" },
     { name = "chartwright-events" },
+    { name = "chartwright-gateway" },
     { name = "chartwright-preprocess" },
     { name = "chartwright-storage" },
     { name = "confluent-kafka" },
@@ -1079,8 +1099,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "chartwright-classify", editable = "libs/chartwright-classify" },
     { name = "chartwright-db", editable = "libs/chartwright-db" },
     { name = "chartwright-events", editable = "libs/chartwright-events" },
+    { name = "chartwright-gateway", editable = "libs/chartwright-gateway" },
     { name = "chartwright-preprocess", editable = "libs/chartwright-preprocess" },
     { name = "chartwright-storage", editable = "libs/chartwright-storage" },
     { name = "confluent-kafka", specifier = ">=2.5.0" },

@@ -48,10 +48,20 @@ class OllamaProvider:
             "options": {
                 "temperature": request.temperature,
                 "num_predict": request.max_tokens,
+                # Observed in practice (CP14): small local VLMs (moondream) can degrade
+                # into a repeated-token loop under greedy decoding (temperature=0) with
+                # no penalty, burning the full token budget on garbage. A mild penalty
+                # is cheap insurance and does not affect determinism in any way ADR-0005
+                # cares about (same input still produces the same output).
+                "repeat_penalty": 1.1,
             },
         }
         if request.images:
             payload["images"] = request.images_b64()
+        if request.response_format is not None:
+            # Ollama's structured-output mode: constrains decoding to a JSON Schema
+            # grammar instead of relying on the model to freehand a parseable format.
+            payload["format"] = request.response_format
 
         started = time.perf_counter()
         try:

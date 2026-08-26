@@ -203,6 +203,38 @@ class DocumentRepository(_AuditedRepository):
             after={"packet_count": packet_count, "boundaries": boundaries},
         )
 
+    def get_page(self, document_id: uuid.UUID, page_number: int) -> DocumentPage | None:
+        return self.session.execute(
+            select(DocumentPage).where(
+                DocumentPage.document_id == document_id, DocumentPage.page_number == page_number
+            )
+        ).scalar_one_or_none()
+
+    def record_classification(
+        self,
+        document_id: uuid.UUID,
+        *,
+        doc_type: str,
+        confidence: float,
+    ) -> Document:
+        """CP14: persist the classifier's verdict. ``confidence`` is the model's
+        self-report — stored as-is but UNCALIBRATED (see chartwright_classify's README);
+        do not use it for routing decisions before CP17. Idempotent re-run safe: setting
+        the same fields again is a no-op transition-wise, just re-audited."""
+        doc = self.session.get_one(Document, document_id)
+        before = _snapshot(doc, self._DOC_SNAPSHOT)
+        doc.doc_type = doc_type
+        doc.doc_type_confidence = confidence
+        self.session.flush()
+        self._audit(
+            "classify",
+            "document",
+            doc.id,
+            before=before,
+            after=_snapshot(doc, self._DOC_SNAPSHOT),
+        )
+        return doc
+
     def list_by_status(self, status: str, *, limit: int = 100) -> list[Document]:
         return list(
             self.session.execute(
