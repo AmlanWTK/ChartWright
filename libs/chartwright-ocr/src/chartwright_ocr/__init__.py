@@ -8,6 +8,7 @@ from chartwright_ocr.grounding import (
     similarity,
     verify_at,
 )
+from chartwright_ocr.serialization import page_ocr_from_json, page_ocr_to_json
 
 __all__ = [
     "GroundingMatch",
@@ -17,6 +18,8 @@ __all__ = [
     "RapidOcrEngine",
     "locate_value",
     "normalize",
+    "page_ocr_from_json",
+    "page_ocr_to_json",
     "similarity",
     "verify_at",
 ]

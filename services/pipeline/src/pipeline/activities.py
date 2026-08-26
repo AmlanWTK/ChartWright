@@ -28,7 +28,15 @@ from chartwright_db import (
     tenant_context,
 )
 from chartwright_events import EventPublisher, publisher_from_env
+from chartwright_extract import extract_document
 from chartwright_gateway import ModelGateway, build_default_gateway
+from chartwright_ocr import (
+    OcrEngine,
+    RapidOcrEngine,
+    page_ocr_from_json,
+    page_ocr_to_json,
+)
+from chartwright_schemas.taxonomy import DocType
 from chartwright_preprocess import (
     HeuristicSplitter,
     file_type_from_extension,
@@ -85,12 +93,16 @@ class PipelineActivities:
         storage: ObjectStorage | None = None,
         settings: PipelineSettings | None = None,
         gateway: ModelGateway | None = None,
+        ocr_engine: OcrEngine | None = None,
     ):
         self._engine = build_engine()
         self._publisher = publisher or publisher_from_env()
         self._settings = settings or get_pipeline_settings()
         self._storage = storage or ObjectStorage(self._settings)
         self._gateway = gateway or build_default_gateway()
+        # RapidOcrEngine loads its ONNX models lazily, so constructing here costs nothing
+        # and keeps the worker's wiring in one place (same pattern as the gateway).
+        self._ocr_engine: OcrEngine = ocr_engine or RapidOcrEngine()
 
     @activity.defn
     def advance_stage(self, input: StageInput) -> str:
@@ -118,6 +130,10 @@ class PipelineActivities:
                 self._normalize_document(repo, tenant_id, doc)
             elif input.to_status == "CLASSIFIED":
                 self._classify_document(repo, tenant_id, doc)
+            elif input.to_status == "OCR_DONE":
+                self._ocr_document(repo, tenant_id, doc)
+            elif input.to_status == "EXTRACTED":
+                self._extract_document(repo, tenant_id, doc)
 
             repo.transition_status(doc_id, input.to_status)
             return input.to_status
@@ -199,6 +215,89 @@ class PipelineActivities:
         repo.record_classification(
             doc.id, doc_type=result.doc_type.value, confidence=result.confidence
         )
+
+    def _ocr_document(
+        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
+    ) -> None:
+        """CP15, completing CP12's pipeline integration.
+
+        CP12 built libs/chartwright-ocr and its eval but never wired the stage, so
+        OCR_DONE advanced the state machine without doing anything. CP15 is the first
+        consumer -- extraction cannot ground a value without tokens -- so it wires it.
+
+        Each normalized page is recognized and its result stored as JSON under a
+        deterministic key, so the EXTRACTED stage (a separate Temporal activity, possibly
+        on another worker) can read it back without a schema change.
+        """
+        if doc.page_count < 1:
+            msg = f"document {doc.id} has no pages; cannot OCR"
+            raise RuntimeError(msg)
+
+        for page_number in range(1, doc.page_count + 1):
+            page = repo.get_page(doc.id, page_number)
+            if page is None or page.image_object_key is None:
+                msg = (
+                    f"document {doc.id} page {page_number} has no normalized image; "
+                    "cannot OCR"
+                )
+                raise RuntimeError(msg)
+            recognized = self._ocr_engine.recognize(self._storage.get(page.image_object_key))
+            self._storage.put_ocr_page(
+                tenant_id=tenant_id,
+                document_id=doc.id,
+                page_number=page_number,
+                data=page_ocr_to_json(recognized),
+            )
+
+    def _extract_document(
+        self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
+    ) -> None:
+        """CP15: pull the schema's fields off the page, each one grounded (ADR-0003/0011).
+
+        Deterministic label anchoring -- no model call. A field whose label cannot be
+        found is absent from the result rather than invented; how often that happens is
+        the metric that sizes CP17's escalation cascade.
+
+        Confidence stored here is UNCALIBRATED (CP17 owns the real signal), and
+        value_normalized is deliberately left unset (CP16 owns normalization).
+        """
+        if doc.doc_type is None:
+            msg = f"document {doc.id} reached EXTRACTED without a doc_type; cannot extract"
+            raise RuntimeError(msg)
+
+        pages = [
+            page_ocr_from_json(
+                self._storage.get(
+                    self._storage.ocr_page_key(
+                        tenant_id=tenant_id, document_id=doc.id, page_number=n
+                    )
+                )
+            )
+            for n in range(1, doc.page_count + 1)
+        ]
+        result = extract_document(
+            pages,
+            DocType(doc.doc_type),
+            str(doc.id),
+            doc_type_confidence=doc.doc_type_confidence or 0.0,
+        )
+        extraction = repo.create_extraction(
+            document_id=doc.id,
+            doc_type=result.doc_type.value,
+            schema_version=result.schema_version,
+            overall_confidence=result.overall_confidence,
+        )
+        for field in result.fields:
+            repo.add_field(
+                extraction_id=extraction.id,
+                field_key=field.key,
+                value_raw=field.value_raw,
+                confidence=field.confidence,
+                page_number=field.provenance.page,
+                bbox=field.provenance.bbox.model_dump(),
+                source_span=field.provenance.source_span,
+                tier=field.tier,
+            )
 
     @activity.defn
     def mark_failed(self, input: FailInput) -> None:

@@ -37,7 +37,7 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP12 | Tier-0 OCR + grounding contract (RapidOCR local; vLLM/GPU deferred to cloud re-entry) | CP11 | ✅ Done |
 | CP13 | Preprocessing, normalization & packet splitting | CP12 | ✅ Done |
 | CP14 | Document classification (describe-then-map per ADR-0010) | CP13 | ✅ Done |
-| CP15 | Structured extraction (grounded, schema-constrained) | CP14 | ⬜ |
+| CP15 | Structured extraction (grounded, schema-constrained) | CP14 | 🟡 In progress |
 | CP16 | Validation, normalization & code systems | CP15 | ⬜ |
 | CP17 | Confidence calibration & escalation cascade | CP16 | ⬜ |
 | CP18 | Policy KB ingestion & vector store | CP11 | ⬜ |

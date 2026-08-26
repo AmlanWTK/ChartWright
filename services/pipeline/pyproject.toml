@@ -10,6 +10,8 @@ dependencies = [
     "chartwright-preprocess",
     "chartwright-storage",
     "chartwright-classify",
+    "chartwright-ocr",
+    "chartwright-extract",
     "chartwright-gateway",
     "temporalio>=1.7.0",
     "confluent-kafka>=2.5.0",
@@ -29,4 +31,6 @@ chartwright-events = { workspace = true }
 chartwright-preprocess = { workspace = true }
 chartwright-storage = { workspace = true }
 chartwright-classify = { workspace = true }
+chartwright-ocr = { workspace = true }
+chartwright-extract = { workspace = true }
 chartwright-gateway = { workspace = true }

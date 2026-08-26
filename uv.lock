@@ -12,6 +12,7 @@ members = [
     "chartwright-classify",
     "chartwright-db",
     "chartwright-events",
+    "chartwright-extract",
     "chartwright-gateway",
     "chartwright-ocr",
     "chartwright-preprocess",
@@ -251,6 +252,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "confluent-kafka", specifier = ">=2.5.0" }]
+
+[[package]]
+name = "chartwright-extract"
+version = "0.1.0"
+source = { editable = "libs/chartwright-extract" }
+dependencies = [
+    { name = "chartwright-ocr" },
+    { name = "chartwright-schemas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chartwright-ocr", editable = "libs/chartwright-ocr" },
+    { name = "chartwright-schemas", editable = "libs/chartwright-schemas" },
+]
 
 [[package]]
 name = "chartwright-gateway"

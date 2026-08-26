@@ -95,6 +95,7 @@ mypy_path = [
     "libs/chartwright-preprocess/src",
     "libs/chartwright-storage/src",
     "libs/chartwright-classify/src",
+    "libs/chartwright-extract/src",
     "services/hello/src",
     "services/ingestion/src",
     "services/pipeline/src",
