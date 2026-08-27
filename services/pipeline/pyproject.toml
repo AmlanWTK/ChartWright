@@ -15,7 +15,7 @@ dependencies = [
     "chartwright-gateway",
     "temporalio>=1.7.0",
     "confluent-kafka>=2.5.0",
-    "pydantic-settings>=2.4.0",
+    "pydantic-settings>=2.15.0",
 ]
 
 [build-system]
