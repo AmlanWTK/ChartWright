@@ -26,6 +26,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -93,6 +94,12 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(30), default="RECEIVED", index=True)
     original_object_key: Mapped[str | None] = mapped_column(String(500))
     normalized_object_key: Mapped[str | None] = mapped_column(String(500))
+    # Packet fan-out (CP15): NULL parent means "this row IS the upload". A child is one
+    # packet split out of its parent by CP13, routed independently from CLASSIFIED on.
+    parent_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    packet_index: Mapped[int | None] = mapped_column(Integer)  # 1-based within parent
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -106,7 +113,16 @@ class Document(Base):
 
     __table_args__ = (
         # Dedupe: the same content submitted twice by a tenant maps to one document.
-        Index("ix_documents_tenant_hash", "tenant_id", "content_hash", unique=True),
+        # PARTIAL on purpose (migration 0003): every packet child shares its parent's
+        # content_hash -- same bytes -- so a total unique index would reject the fan-out.
+        # Dedupe is a property of uploads, not of the packets split out of one.
+        Index(
+            "ix_documents_tenant_hash",
+            "tenant_id",
+            "content_hash",
+            unique=True,
+            postgresql_where=text("parent_document_id IS NULL"),
+        ),
         Index("ix_documents_tenant_status_sla", "tenant_id", "status", "sla_due_at"),
     )
 

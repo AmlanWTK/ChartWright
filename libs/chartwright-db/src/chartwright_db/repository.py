@@ -203,6 +203,58 @@ class DocumentRepository(_AuditedRepository):
             after={"packet_count": packet_count, "boundaries": boundaries},
         )
 
+    def create_child_document(
+        self, parent: Document, *, packet_index: int, page_count: int
+    ) -> Document:
+        """Create one packet child of ``parent``, routed independently from CLASSIFIED on.
+
+        CP13 splits an upload into logical packets; extraction (CP15) is per document type,
+        so each packet needs its own Document row rather than sharing the parent's.
+
+        The child deliberately reuses the parent's ``content_hash`` and
+        ``original_object_key``: it is the same uploaded bytes, and pretending otherwise
+        would break provenance. That is only legal because migration 0003 made the dedupe
+        index PARTIAL (``WHERE parent_document_id IS NULL``) -- a total unique index on
+        (tenant_id, content_hash) would reject every child after the first.
+
+        Starts at NORMALIZED, not RECEIVED: the parent already did intake and page
+        normalization, and re-running those per packet would duplicate work and pages.
+        """
+        child = Document(
+            tenant_id=self._tenant_id(),
+            parent_document_id=parent.id,
+            packet_index=packet_index,
+            external_ref=parent.external_ref,
+            source_channel=parent.source_channel,
+            content_hash=parent.content_hash,
+            page_count=page_count,
+            original_object_key=parent.original_object_key,
+            status="NORMALIZED",
+        )
+        self.session.add(child)
+        self.session.flush()
+        self._audit(
+            "create",
+            "document",
+            child.id,
+            after={
+                "parent_document_id": str(parent.id),
+                "packet_index": packet_index,
+                "page_count": page_count,
+                "status": "NORMALIZED",
+            },
+        )
+        return child
+
+    def list_children(self, parent_id: uuid.UUID) -> list[Document]:
+        """Packet children of an upload, in packet order (empty for a single-packet doc)."""
+        stmt = (
+            select(Document)
+            .where(Document.parent_document_id == parent_id)
+            .order_by(Document.packet_index)
+        )
+        return list(self.session.scalars(stmt))
+
     def get_page(self, document_id: uuid.UUID, page_number: int) -> DocumentPage | None:
         return self.session.execute(
             select(DocumentPage).where(
