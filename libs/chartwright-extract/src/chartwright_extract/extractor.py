@@ -19,7 +19,10 @@ from chartwright_extract.anchor import MIN_LABEL_SCORE, AnchorMatch, anchor_fiel
 
 
 def _best_across_pages(
-    pages: Sequence[PageOcr], label: str, min_label_score: float
+    pages: Sequence[PageOcr],
+    label: str,
+    min_label_score: float,
+    other_labels: Sequence[str],
 ) -> tuple[int, AnchorMatch] | None:
     """Best anchor for ``label`` over every page, as (1-based page number, match).
 
@@ -29,7 +32,9 @@ def _best_across_pages(
     """
     best: tuple[int, AnchorMatch] | None = None
     for index, page in enumerate(pages, start=1):
-        match = anchor_field(page, label, min_label_score=min_label_score)
+        match = anchor_field(
+            page, label, min_label_score=min_label_score, other_labels=other_labels
+        )
         if match is None:
             continue
         if best is None or match.label_score > best[1].label_score:
@@ -60,8 +65,12 @@ def extract_document(
     fields: list[GroundedField] = []
 
     if schema is not None:
+        # Every other field's printed label, so a row whose value the engine missed cannot
+        # silently return the next field's label as its value (see anchor.py).
+        labels = tuple(s.label for s in schema.fields)
         for spec in schema.fields:
-            found = _best_across_pages(pages, spec.label, min_label_score)
+            others = tuple(label for label in labels if label != spec.label)
+            found = _best_across_pages(pages, spec.label, min_label_score, others)
             if found is None:
                 continue  # absent, not invented -- see module docstring
             page_number, match = found

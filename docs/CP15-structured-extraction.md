@@ -215,5 +215,53 @@ re-run against the new column.
    skipped through an entire checkpoint's DoD. If a verification flag lands, CP15 should
    run under it.
 
+## Measured results (extraction, `scripts/eval_extract.py --count 10`)
+
+| slice | exact | fuzzy | missed | IoU | critical |
+|-------|-------|-------|--------|-----|----------|
+| clean | **90.8%** | 91.5% | 7.7% | 0.68 | **98.6%** |
+| fax | 63.1% | 72.3% | 24.6% | 0.56 | 70.0% |
+| bad_fax | **0.0%** | 0.0% | **100.0%** | 0.00 | 0.0% |
+
+Mechanism gates all PASS: 0/234 self-verification failures, 0 off-schema keys, deterministic
+re-run identical. Capability gate PASS at 90.8% against ≥ 90% — **0.8 points of margin**,
+which is thin enough that the next schema change could break it.
+
+Critical-field accuracy of 98.6% exceeds the 95% NFR, and means nothing yet: it is clean
+synthetic forms whose labels come from the same code that defines the gold. CP26's gold set
+and CP27's real documents are where that claim gets earned.
+
+**`bad_fax` collapses completely** — 0% exact, 100% missed. Reported, not gated, per the
+gate design. It is the number that sizes CP17: escalation must carry *every* badly-degraded
+document, not a minority of them.
+
+### The bug the gate nearly hid
+
+`urgency` scored 0% while reporting 0% missed — it returned `'Contact Phone:'`, the *next
+field's printed label*, on all 10 documents, **and passed self-verification** (that text
+genuinely is at that bbox). Grounding proves where text sits, never that it means what we
+claim, so provenance could not catch it. Fixed by a semantic guard: a form value is never
+another field's printed label (`_looks_like_another_label`). `urgency` now reports as
+absent, which CP17 can escalate, rather than fabricated, which propagates.
+
+The overall number did not move — 90.8% before and after — because the field scored zero
+either way. **A passing aggregate concealed a field that was fabricating 100% of the time.**
+Per-field reporting is what surfaced it; the headline gate never would have.
+
+### Open at time of writing
+- **`urgency` is 100% missed on the clean slice and the root cause is not established.** The
+  value is drawn identically to the other twelve rows (label x=90, value x=650, 96px pitch),
+  so a layout explanation does not hold. Failing safe is not the same as working. Next step
+  is to dump the OCR tokens for that row and look, rather than reason about it — three
+  hypotheses have already been wrong this checkpoint.
+- **`clinical_justification` is unmeasured** (`--`): the generator draws it but records no
+  gold label, so the eval cannot see it. Same shape as CP14's insurance-card bug — the eval
+  only measures what the generator admits to.
+- **Integration tests have never run against this wiring.** `OCR_DONE` and `EXTRACTED` are
+  proven only against hand-built fakes; the CP10 lifecycle test skipped because Docker Hub
+  could not be reached to pull Postgres/Kafka/Temporal. **CP15 cannot close until it runs.**
+  This is exactly CP14's recorded finding — a skipped integration test satisfying a DoD
+  clause while proving nothing — recurring one checkpoint later.
+
 ## Execution log
 - (empty — awaiting approval)

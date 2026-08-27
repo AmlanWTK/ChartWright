@@ -82,12 +82,45 @@ class TestAnchorField:
     def test_empty_page_returns_none(self) -> None:
         assert anchor_field(page(), "Member ID") is None
 
+    def test_refuses_to_return_another_fields_label_as_a_value(self) -> None:
+        """The CP15 eval's `urgency = 'Contact Phone:'` bug.
+
+        When a row's value is not detected, the below-fallback reaches the next form row,
+        whose first text is that field's LABEL. The result was grounded and wrong -- which
+        provenance cannot catch, since the text really is at that box.
+        """
+        p = page(
+            tok("Urgency:", 90, 200),
+            tok("Contact", 90, 296),
+            tok("Phone:", 190, 296),
+            tok("(555)", 600, 296),
+        )
+        assert anchor_field(p, "Urgency") is not None  # unguarded, it happily returns one
+        assert anchor_field(p, "Urgency", other_labels=("Contact Phone",)) is None
+
+    def test_guard_does_not_reject_a_legitimate_value(self) -> None:
+        match = anchor_field(_form_page(), "Member ID", other_labels=("Contact Phone",))
+        assert match is not None
+        assert match.value == "A21743360"
+
 
 class TestExtractDocument:
     def test_extracts_the_fields_the_page_supports(self) -> None:
         result = extract_document([_form_page()], DocType.PRIOR_AUTH_REQUEST, "d1")
         keys = {f.key for f in result.fields}
         assert {"member_id", "member_name", "member_dob"} <= keys
+
+    def test_next_field_label_is_never_emitted_as_a_value(self) -> None:
+        """End-to-end guard: the schema's own labels are passed in by extract_document."""
+        p = page(
+            tok("Urgency:", 90, 200),
+            tok("Contact", 90, 296),
+            tok("Phone:", 190, 296),
+            tok("(555)", 600, 296),
+        )
+        result = extract_document([p], DocType.PRIOR_AUTH_REQUEST, "d1")
+        values = {f.key: f.value_raw for f in result.fields}
+        assert "Contact Phone" not in values.get("urgency", "")
 
     def test_unfound_fields_are_absent_never_fabricated(self) -> None:
         """The core ADR-0003 contract: no anchor means no field, not an invented one."""

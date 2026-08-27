@@ -20,6 +20,7 @@ verified field -- that is CP16's job (validation, code systems) and CP17's (cali
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from chartwright_ocr import OcrToken, PageOcr, similarity
@@ -35,6 +36,10 @@ _MAX_LABEL_TOKENS = 4
 # A value is at most this many tokens; beyond it we are almost certainly reading the next
 # field's label rather than this field's value.
 _MAX_VALUE_TOKENS = 8
+
+# How closely an extracted value must resemble another field's printed label before we
+# refuse to believe it is a value. See _looks_like_another_label.
+_LABEL_COLLISION_THRESHOLD = 0.90
 
 
 @dataclass(frozen=True)
@@ -123,10 +128,32 @@ def _value_below(tokens: list[OcrToken], label_end: int, anchor: OcrToken) -> li
     return out
 
 
+def _looks_like_another_label(value: str, other_labels: Sequence[str]) -> bool:
+    """Is this "value" actually the next field's printed label?
+
+    Found by the CP15 eval: on a row whose value the OCR engine did not detect,
+    _value_to_the_right returns nothing, _value_below fires, and the line below a form
+    row is the *next field's label*. The result was `urgency = 'Contact Phone:'` --
+    confidently wrong AND correctly grounded, since that text really is at that box.
+
+    Grounding cannot catch this: provenance proves where text is, never that it means
+    what we claim. So the guard is semantic instead -- a form value is never another
+    field's label, and a field we refuse to read is absent, which CP17 can escalate.
+    """
+    return any(similarity(value, other) >= _LABEL_COLLISION_THRESHOLD for other in other_labels)
+
+
 def anchor_field(
-    page: PageOcr, label: str, *, min_label_score: float = MIN_LABEL_SCORE
+    page: PageOcr,
+    label: str,
+    *,
+    min_label_score: float = MIN_LABEL_SCORE,
+    other_labels: Sequence[str] = (),
 ) -> AnchorMatch | None:
     """Locate ``label`` on the page and read the value next to it.
+
+    ``other_labels`` are the document type's other printed labels; a candidate value that
+    matches one of them is rejected (see _looks_like_another_label).
 
     Returns ``None`` when the label cannot be found or carries no value tokens. The caller
     must NOT invent a value in that case -- an absent field is the correct, auditable
@@ -144,6 +171,8 @@ def anchor_field(
     value_tokens = _value_to_the_right(tokens, end, anchor) or _value_below(tokens, end, anchor)
     value = " ".join(t.text for t in value_tokens).strip()
     if not value_tokens or not value:
+        return None
+    if _looks_like_another_label(value, other_labels):
         return None
 
     mean_conf = sum(t.confidence for t in value_tokens) / len(value_tokens)
