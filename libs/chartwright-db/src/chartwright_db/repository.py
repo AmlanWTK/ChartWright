@@ -99,9 +99,20 @@ class DocumentRepository(_AuditedRepository):
         original_object_key: str | None = None,
     ) -> Document:
         """Create a document, or return the existing one with the same content hash
-        (idempotent ingestion — FR-ING-04)."""
+        (idempotent ingestion — FR-ING-04).
+
+        Scoped to uploads (``parent_document_id IS NULL``) since CP15's packet fan-out:
+        a mixed upload's children all carry the parent's content_hash, so an unscoped
+        lookup would match parent + N children and ``scalar_one_or_none`` would raise
+        MultipleResultsFound — i.e. resubmitting a multi-packet fax would crash intake.
+        The same predicate keys the partial unique index added in migration 0003, so the
+        query and the constraint agree on what "already ingested" means.
+        """
         existing = self.session.execute(
-            select(Document).where(Document.content_hash == content_hash)
+            select(Document).where(
+                Document.content_hash == content_hash,
+                Document.parent_document_id.is_(None),
+            )
         ).scalar_one_or_none()
         if existing is not None:
             return existing

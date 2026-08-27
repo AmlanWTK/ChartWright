@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from chartwright_classify import classify_packet
@@ -39,6 +40,7 @@ from chartwright_ocr import (
 )
 from chartwright_preprocess import (
     HeuristicSplitter,
+    Packet,
     file_type_from_extension,
     load_pages,
     normalize_page,
@@ -190,6 +192,51 @@ class PipelineActivities:
             packet_count=len(packets),
             boundaries=[list(p.page_indices) for p in packets],
         )
+        # Fan-out (CP15): a mixed upload becomes one Document per packet, because
+        # classification and extraction are both per document type. A single-packet
+        # upload -- overwhelmingly the common case -- takes the unchanged path: the
+        # parent IS the document and no child rows exist.
+        if len(packets) > 1:
+            self._fan_out_packets(repo, tenant_id, doc, packets, page_inputs)
+
+    def _fan_out_packets(
+        self,
+        repo: DocumentRepository,
+        tenant_id: uuid.UUID,
+        parent: Document,
+        packets: Sequence[Packet],
+        page_inputs: list[NormalizedPageInput],
+    ) -> None:
+        """Create one child Document per packet, each owning its own page rows.
+
+        Children reference the SAME normalized image object keys as the parent: the pixels
+        are already stored once, and only the DocumentPage rows are per-child. That is what
+        lets everything downstream stay unchanged -- page_count, get_page(child, 1), OCR and
+        extraction all see a child as an ordinary single-packet document, with its pages
+        renumbered from 1.
+
+        The parent stops at NORMALIZED. It is the upload, not a document to extract from;
+        its own pages stay attached for provenance and for the review console to show the
+        original alongside the packets split out of it.
+
+        Children reuse the parent's content_hash (same bytes), which only inserts because
+        migration 0003 made the dedupe index partial on `parent_document_id IS NULL`.
+        """
+        manifest = f"tenants/{tenant_id}/documents/{parent.id}/normalized/"
+        for packet_index, packet in enumerate(packets, start=1):
+            child = repo.create_child_document(
+                parent, packet_index=packet_index, page_count=len(packet.page_indices)
+            )
+            child_pages = [
+                NormalizedPageInput(
+                    page_number=child_page_number,
+                    width=page_inputs[parent_index].width,
+                    height=page_inputs[parent_index].height,
+                    image_object_key=page_inputs[parent_index].image_object_key,
+                )
+                for child_page_number, parent_index in enumerate(packet.page_indices, start=1)
+            ]
+            repo.record_normalized_pages(child.id, child_pages, normalized_object_key=manifest)
 
     def _classify_document(
         self, repo: DocumentRepository, tenant_id: uuid.UUID, doc: Document
