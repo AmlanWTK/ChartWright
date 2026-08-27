@@ -219,49 +219,85 @@ re-run against the new column.
 
 | slice | exact | fuzzy | missed | IoU | critical |
 |-------|-------|-------|--------|-----|----------|
-| clean | **90.8%** | 91.5% | 7.7% | 0.68 | **98.6%** |
-| fax | 63.1% | 72.3% | 24.6% | 0.56 | 70.0% |
+| clean | **98.5%** | 99.2% | 0.0% | 0.68 | **98.6%** |
+| fax | 69.2% | 78.5% | 16.2% | 0.55 | 74.3% |
 | bad_fax | **0.0%** | 0.0% | **100.0%** | 0.00 | 0.0% |
 
-Mechanism gates all PASS: 0/234 self-verification failures, 0 off-schema keys, deterministic
-re-run identical. Capability gate PASS at 90.8% against ≥ 90% — **0.8 points of margin**,
-which is thin enough that the next schema change could break it.
+Mechanism gates all PASS: 0/255 self-verification failures, 0 off-schema keys, deterministic
+re-run identical. Capability gate PASS at 98.5% against ≥ 90%.
 
-Critical-field accuracy of 98.6% exceeds the 95% NFR, and means nothing yet: it is clean
-synthetic forms whose labels come from the same code that defines the gold. CP26's gold set
-and CP27's real documents are where that claim gets earned.
+Critical-field accuracy of 98.6% exceeds the 95% NFR, and means little yet: clean synthetic
+forms whose labels come from the same code that defines the gold. CP26's gold set and CP27's
+real documents are where that claim gets earned.
 
-**`bad_fax` collapses completely** — 0% exact, 100% missed. Reported, not gated, per the
-gate design. It is the number that sizes CP17: escalation must carry *every* badly-degraded
+**`bad_fax` collapses completely** — 0% exact, 100% missed. Reported, not gated, per the gate
+design. It is the number that sizes CP17: escalation must carry *every* badly-degraded
 document, not a minority of them.
 
 ### The bug the gate nearly hid
 
-`urgency` scored 0% while reporting 0% missed — it returned `'Contact Phone:'`, the *next
-field's printed label*, on all 10 documents, **and passed self-verification** (that text
-genuinely is at that bbox). Grounding proves where text sits, never that it means what we
-claim, so provenance could not catch it. Fixed by a semantic guard: a form value is never
-another field's printed label (`_looks_like_another_label`). `urgency` now reports as
-absent, which CP17 can escalate, rather than fabricated, which propagates.
+`urgency` first measured 0% while reporting 0% missed — it returned `'Contact Phone:'`, the
+*next field's printed label*, on all ten documents, **and passed self-verification**, because
+that text genuinely is at that bbox. The overall figure was 90.8% and PASS. A field
+fabricating 100% of the time was invisible in the aggregate; only per-field reporting showed
+it.
 
-The overall number did not move — 90.8% before and after — because the field scored zero
-either way. **A passing aggregate concealed a field that was fabricating 100% of the time.**
-Per-field reporting is what surfaced it; the headline gate never would have.
+**Root cause: two sources of truth had drifted.** The schema declared
+`label="Urgency (Standard/Urgent)"` while the form printed `"Urgency:"`. `_find_label` then
+matched the two-token window `['Urgency:', 'Standard']` at 0.82 — absorbing the *value* into
+the label — so the value-reader started past it, found nothing on that line, dropped to the
+row below and returned the next field's label. `FieldSpec.label` is documented as "the human
+label as typically printed on forms"; no form prints its own permitted values. The schema was
+wrong, not the anchor.
+
+It took three wrong hypotheses to find (the collision guard was rejecting it; the clean slice
+was not a no-op; the image mode differed), each argued from source and each killed by data.
+Fixing `urgency` moved clean accuracy 90.8% → 98.5% and missed 7.7% → 0.0%.
+
+Two defences came out of it, and the second matters more than the first:
+
+1. **A label-collision guard** in `anchor_field` — a form value is never another field's
+   printed label. This turned a grounded fabrication into an honest absence, which CP17 can
+   escalate. It treats the symptom, and is worth keeping for the general case.
+2. **`test_label_consistency_unit.py`** — asserts the generator's printed labels equal the
+   schema's declared labels. This addresses the *class*: two sources of truth drifting with
+   nothing checking they agree. **It found two more instances on its first run**
+   (`diagnosis_code`, `procedure_code`, both missing the word "Code"), which were still
+   working only because fuzzy matching absorbed the gap at 0.84.
+
+### What grounding cannot defend against
+
+Both remaining clean-slice failures are OCR glyph confusion that arrives grounded, verified,
+and wrong:
+
+- `Dr. Avery Iyer, MD` → `Dr. Avery lyer, MD` (capital I as lowercase l)
+- `I25.10` → `125.10` (capital I as digit 1) — **a critical ICD-10 field**
+
+`125.10` is not a valid ICD-10 code; the format is a letter followed by digits. It was
+extracted, grounded, self-verified and silently corrupt. `verify_at` reported 0/255 failures
+throughout, correctly: the text really was at that box. **Provenance proves location, never
+recognition.**
+
+These are concrete acceptance cases for CP16, not aspirations: a `FieldKind.ICD10` validator
+rejects `125.10` on format alone, and a `FieldKind.TEXT` field whose value equals another
+field's label is rejectable on content. Both of this checkpoint's silent-corruption modes are
+catchable by validation and neither is catchable by grounding.
 
 ### Open at time of writing
-- **`urgency` is 100% missed on the clean slice and the root cause is not established.** The
-  value is drawn identically to the other twelve rows (label x=90, value x=650, 96px pitch),
-  so a layout explanation does not hold. Failing safe is not the same as working. Next step
-  is to dump the OCR tokens for that row and look, rather than reason about it — three
-  hypotheses have already been wrong this checkpoint.
 - **`clinical_justification` is unmeasured** (`--`): the generator draws it but records no
-  gold label, so the eval cannot see it. Same shape as CP14's insurance-card bug — the eval
+  gold label, so the eval cannot see it. Same shape as CP14's insurance-card bug — an eval
   only measures what the generator admits to.
+- **`REFERRAL` still declares `label="Diagnosis (ICD-10)"`.** Left deliberately: that type has
+  no generator, so there is no evidence of what a referral form prints, and guessing is what
+  caused this bug. When a referral generator lands, extend the consistency test to it and let
+  the form decide.
 - **Integration tests have never run against this wiring.** `OCR_DONE` and `EXTRACTED` are
   proven only against hand-built fakes; the CP10 lifecycle test skipped because Docker Hub
   could not be reached to pull Postgres/Kafka/Temporal. **CP15 cannot close until it runs.**
-  This is exactly CP14's recorded finding — a skipped integration test satisfying a DoD
-  clause while proving nothing — recurring one checkpoint later.
+  This is CP14's own recorded finding — a skipped integration test satisfying a DoD clause
+  while proving nothing — recurring one checkpoint later.
+- **Multi-packet fan-out is not built.** Blocked on the same Docker outage, since it needs a
+  migration plus CP08's tenant-isolation tests re-run against the new column.
 
 ## Execution log
 - (empty — awaiting approval)

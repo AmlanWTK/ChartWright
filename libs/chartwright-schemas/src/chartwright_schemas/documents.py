@@ -60,9 +60,17 @@ PRIOR_AUTH_REQUEST = DocSchema(
             required=False,
         ),
         FieldSpec(
-            key="diagnosis_code", label="Diagnosis (ICD-10)", kind=FieldKind.ICD10, critical=True
+            key="diagnosis_code",
+            label="Diagnosis Code (ICD-10)",
+            kind=FieldKind.ICD10,
+            critical=True,
         ),
-        FieldSpec(key="procedure_code", label="Procedure (CPT)", kind=FieldKind.CPT, critical=True),
+        FieldSpec(
+            key="procedure_code",
+            label="Procedure Code (CPT)",
+            kind=FieldKind.CPT,
+            critical=True,
+        ),
         FieldSpec(
             key="date_of_service",
             label="Requested Date of Service",
@@ -70,7 +78,16 @@ PRIOR_AUTH_REQUEST = DocSchema(
             critical=True,
         ),
         FieldSpec(
-            key="urgency", label="Urgency (Standard/Urgent)", kind=FieldKind.TEXT, required=False
+            key="urgency",
+            # Label is what the form PRINTS (see FieldSpec.label), not a description of
+            # the allowed values. "Urgency (Standard/Urgent)" made CP15's label anchor
+            # match the two-token window ['Urgency:', 'Standard'] at 0.82 -- swallowing
+            # the value into the label, so the value-reader looked past it and returned
+            # the NEXT field's label. Enumerate allowed values in FieldKind/validation
+            # (CP16), never in the printed label.
+            label="Urgency",
+            kind=FieldKind.TEXT,
+            required=False,
         ),
         FieldSpec(
             key="clinical_justification",
