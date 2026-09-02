@@ -17,6 +17,7 @@ ADRs capture significant architectural decisions with their context, options, an
 | [0009](0009-shared-object-storage-library.md) | Shared object-storage library | Accepted |
 | [0010](0010-describe-then-map-classification.md) | Classify by describe-then-map, not constrained selection | Accepted |
 | [0011](0011-deterministic-label-anchored-extraction.md) | Extraction's cheapest tier uses no model at all | Accepted |
+| [0012](0012-packet-fanout-parent-joins-children.md) | A fanned-out upload completes when its packets complete | Accepted |
 
 ## When to write an ADR
 

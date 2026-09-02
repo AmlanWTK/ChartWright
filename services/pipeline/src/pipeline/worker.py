@@ -29,7 +29,11 @@ async def run_worker() -> None:
         client,
         task_queue=settings.task_queue,
         workflows=[DocumentPipelineWorkflow],
-        activities=[activities.advance_stage, activities.mark_failed],
+        activities=[
+            activities.advance_stage,
+            activities.mark_failed,
+            activities.list_packet_children,
+        ],
         # Our activities are sync (SQLAlchemy is sync); Temporal runs them here.
         activity_executor=ThreadPoolExecutor(max_workers=8),
     )

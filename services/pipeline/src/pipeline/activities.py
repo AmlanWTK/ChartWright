@@ -82,6 +82,12 @@ class FailInput:
     reason: str
 
 
+@dataclass
+class ChildrenInput:
+    document_id: str
+    tenant_id: str
+
+
 class PoisonedDocumentError(Exception):
     """Deterministic failure injected via the poison hook (testing/chaos)."""
 
@@ -361,3 +367,22 @@ class PipelineActivities:
                 "reason": input.reason,  # structured reason; no PHI
             },
         )
+
+    @activity.defn
+    def list_packet_children(self, input: ChildrenInput) -> list[str]:
+        """Packet children of an upload, in packet order; empty for a single-packet doc.
+
+        The workflow needs this to decide whether to fan out (ADR-0012), and it cannot
+        query the database itself -- workflow code must stay deterministic, so all I/O
+        lives in activities.
+
+        Deliberately a *query*, not a flag carried on the workflow input. The child rows
+        are the fact; anything else is a second copy of that fact, and this codebase has
+        already been bitten twice by two copies drifting apart (the CP15 urgency label,
+        and the MinIO port). It also makes the recursion guard free: a child's own child
+        list is always empty, so a child never fans out again.
+        """
+        with tenant_context(self._engine, uuid.UUID(input.tenant_id)) as session:
+            repo = DocumentRepository(session, actor="pipeline-worker")
+            children = repo.list_children(uuid.UUID(input.document_id))
+            return [str(child.id) for child in children]
