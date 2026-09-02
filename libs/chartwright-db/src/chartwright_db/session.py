@@ -17,6 +17,7 @@ import os
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
@@ -37,8 +38,27 @@ def admin_database_url() -> str:
     return os.environ.get("CHARTWRIGHT_DATABASE_ADMIN_URL", _DEV_ADMIN_URL)
 
 
-def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
-    return create_engine(url or app_database_url(), echo=echo, pool_pre_ping=True)
+def build_engine(
+    url: str | None = None, *, echo: bool = False, connect_timeout: int | None = None
+) -> Engine:
+    """Engine for ``url`` (the app role by default).
+
+    ``connect_timeout`` bounds the TCP connect, in seconds. Without it an unreachable
+    host -- a stopped container, as opposed to a refused port -- hangs for the OS
+    default of several minutes. Integration-test skip guards pass a small value so a
+    missing dependency is reported in seconds; the first version of those guards turned
+    an 18-test skip into a 13-minute wait, which is barely better than the failure it
+    replaced.
+    """
+    connect_args: dict[str, Any] = {}
+    if connect_timeout is not None:
+        connect_args["connect_timeout"] = connect_timeout
+    return create_engine(
+        url or app_database_url(),
+        echo=echo,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
 
 
 @contextmanager

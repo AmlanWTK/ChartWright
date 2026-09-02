@@ -83,6 +83,16 @@ class ObjectStorage:
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data)
         return key
 
+    def check_ready(self) -> None:
+        """Raise unless the configured bucket is reachable with these credentials.
+
+        ``exists()`` deliberately swallows ClientError to answer "is this key here?",
+        which makes it useless as a dependency check: a rejected credential and an
+        absent object both return False. Integration tests need that difference so a
+        missing dependency SKIPS instead of failing as though the code were broken.
+        """
+        self._client.head_bucket(Bucket=self._bucket)
+
     def exists(self, key: str) -> bool:
         try:
             self._client.head_object(Bucket=self._bucket, Key=key)

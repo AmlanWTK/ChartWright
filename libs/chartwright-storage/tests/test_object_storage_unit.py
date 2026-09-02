@@ -3,6 +3,8 @@
 import uuid
 from dataclasses import dataclass
 
+import pytest
+from botocore.exceptions import ClientError
 from chartwright_storage import ObjectStorage
 
 
@@ -60,3 +62,33 @@ class TestKeyLayout:
             tenant_id=tenant_id, document_id=doc_id, data=b"x", extension=".jpg"
         )
         assert captured["Key"] == f"quarantine/{tenant_id}/{doc_id}.jpg"
+
+
+class TestReadinessProbe:
+    """check_ready exists because exists() cannot tell "absent" from "rejected"."""
+
+    def test_probes_the_configured_bucket(self) -> None:
+        storage = ObjectStorage(_FakeSettings(s3_bucket="probe-me"))
+        captured = {}
+        storage._client.head_bucket = lambda **kw: captured.update(kw)  # type: ignore[attr-defined]
+        storage.check_ready()
+        assert captured == {"Bucket": "probe-me"}
+
+    def test_rejected_credentials_raise_here_but_are_swallowed_by_exists(self) -> None:
+        """The exact distinction the CP09 skip guard depends on.
+
+        exists() answers "is this key here?" and returns False for any ClientError,
+        so bad credentials look identical to a missing object. That is why those
+        integration tests failed instead of skipping when MinIO was down.
+        """
+        storage = ObjectStorage(_FakeSettings())
+
+        def _denied(**_: object) -> None:
+            raise ClientError({"Error": {"Code": "InvalidAccessKeyId"}}, "HeadBucket")
+
+        storage._client.head_bucket = _denied  # type: ignore[attr-defined]
+        storage._client.head_object = _denied  # type: ignore[attr-defined]
+
+        with pytest.raises(ClientError):
+            storage.check_ready()
+        assert storage.exists("any-key") is False

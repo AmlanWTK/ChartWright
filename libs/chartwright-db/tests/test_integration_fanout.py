@@ -28,12 +28,16 @@ from sqlalchemy import text
 
 pytestmark = pytest.mark.integration
 
+# Bounds the reachability probe. A stopped container does not refuse the port, it
+# swallows the SYN, so an unbounded connect hangs for minutes per module.
+_PROBE_TIMEOUT_S = 3
+
 _KEY = "tenants/t/documents/p/normalized/"
 
 
 @pytest.fixture(scope="module")
 def admin_engine():  # type: ignore[no-untyped-def]
-    engine = build_engine(admin_database_url())
+    engine = build_engine(admin_database_url(), connect_timeout=_PROBE_TIMEOUT_S)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

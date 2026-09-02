@@ -28,13 +28,16 @@ from sqlalchemy import select, text
 
 pytestmark = pytest.mark.integration
 
+# Bounds the reachability probe -- see test_integration_rls.py.
+_PROBE_TIMEOUT_S = 3
+
 _PDF = b"%PDF-1.7\n% synthetic test document, no PHI\n%%EOF"
 _EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
 
 @pytest.fixture(scope="module")
 def stack():  # type: ignore[no-untyped-def]
-    admin = build_engine(admin_database_url())
+    admin = build_engine(admin_database_url(), connect_timeout=_PROBE_TIMEOUT_S)
     try:
         with admin.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -44,14 +47,22 @@ def stack():  # type: ignore[no-untyped-def]
     with no_tenant_session(admin) as s:
         s.add(Tenant(id=tenant_id, name=f"ingest-test-{tenant_id.hex[:8]}"))
     settings = get_settings()
+    storage = ObjectStorage(settings)
+    try:
+        storage.check_ready()
+    except Exception as exc:  # pragma: no cover
+        # These tests need object storage as much as they need Postgres, but only
+        # Postgres was guarded -- so a down MinIO read as a CP09 regression instead
+        # of a missing dependency. Name it, and skip.
+        pytest.skip(f"Object storage not reachable ({type(exc).__name__}) — make local-up")
     service = IntakeService(
         engine=build_engine(),
-        storage=ObjectStorage(settings),
+        storage=storage,
         scanner=EicarScanner(),
         events=LoggingEventPublisher(),
         settings=settings,
     )
-    return service, tenant_id, ObjectStorage(settings)
+    return service, tenant_id, storage
 
 
 class TestIntakePipeline:
