@@ -24,7 +24,7 @@ curl.exe -X POST http://localhost:8100/v1/documents `
 ```
 
 Resubmit the same file → same `document_id`, `"dedupe": true`. Check MinIO console
-(http://localhost:9001) → bucket `chartwright-documents` → `tenants/<tenant>/documents/...`.
+(http://localhost:19001) → bucket `chartwright-documents` → `tenants/<tenant>/documents/...`.
 
 ## Pipeline order (and why)
 

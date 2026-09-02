@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CHARTWRIGHT_", extra="ignore")
 
     # Object storage (S3-compatible; MinIO locally, S3 in prod)
-    s3_endpoint: str = "http://localhost:9000"
+    s3_endpoint: str = "http://localhost:19000"
     s3_access_key: str = "chartwright"  # dev-only default (CP04-L MinIO)
     # Dev-only default matching the CP04-L MinIO container; real envs MUST override
     # via CHARTWRIGHT_S3_SECRET_KEY. Suppression is deliberate and reviewed.

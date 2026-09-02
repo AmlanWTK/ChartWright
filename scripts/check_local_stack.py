@@ -42,7 +42,7 @@ TCP_CHECKS: list[TcpCheck] = [
 
 HTTP_CHECKS: list[HttpCheck] = [
     # MinIO liveness endpoint; 200 when the S3 API is up.
-    HttpCheck("minio", "http://localhost:9000/minio/health/live"),
+    HttpCheck("minio", "http://localhost:19000/minio/health/live"),
     # Temporal UI serves its SPA at root.
     HttpCheck("temporal-ui", "http://localhost:8233/", ok_statuses=(200, 301, 302)),
 ]

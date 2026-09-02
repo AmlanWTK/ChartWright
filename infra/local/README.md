@@ -27,8 +27,8 @@ First start pulls images (~1–2 GB) and takes a few minutes; Temporal waits for
 | Temporal | `localhost:7233` | — | Temporal on EKS |
 | Temporal Web UI | http://localhost:8233 | — | — |
 | Redis 7 | `localhost:6379` | — | ElastiCache |
-| MinIO (S3 API) | `localhost:9000` | `chartwright` / `chartwright_dev` | S3 |
-| MinIO console | http://localhost:9001 | same | — |
+| MinIO (S3 API) | `localhost:19000` (high host port; 9000 is heavily contested and a foreign MinIO there fails as InvalidAccessKeyId) | `chartwright` / `chartwright_dev` | S3 |
+| MinIO console | http://localhost:19001 | same | — |
 
 A bucket named `chartwright-documents` is created automatically.
 

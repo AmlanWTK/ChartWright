@@ -134,8 +134,15 @@ services:
       MINIO_ROOT_USER: chartwright
       MINIO_ROOT_PASSWORD: chartwright_dev # dev-only
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
+      # Host ports 19000/19001, same reasoning as Postgres above. 9000/9001 are
+      # among the most contested ports on a dev machine, and a *different* MinIO
+      # answering 9000 fails as InvalidAccessKeyId, not as a connection error --
+      # it looks like a credentials bug and costs an afternoon. A high port makes
+      # that class of collision impossible.
+      # Container-internal ports stay 9000/9001, so minio-init's
+      # http://minio:9000 alias below is unaffected.
+      - "19000:9000" # S3 API
+      - "19001:9001" # web console
     volumes:
       - minio_data:/data
     healthcheck:

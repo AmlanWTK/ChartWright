@@ -17,7 +17,7 @@ class PipelineSettings(BaseSettings):
 
     # Object storage (S3-compatible; MinIO locally, S3 in prod). Defaults match
     # ingestion.config.Settings exactly — same CP04-L MinIO container, same bucket.
-    s3_endpoint: str = "http://localhost:9000"
+    s3_endpoint: str = "http://localhost:19000"
     s3_access_key: str = "chartwright"  # dev-only default (CP04-L MinIO)
     s3_secret_key: str = "chartwright_dev"  # noqa: S105
     s3_bucket: str = "chartwright-documents"
