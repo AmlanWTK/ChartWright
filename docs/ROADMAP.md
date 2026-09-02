@@ -37,7 +37,7 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP12 | Tier-0 OCR + grounding contract (RapidOCR local; vLLM/GPU deferred to cloud re-entry) | CP11 | ✅ Done |
 | CP13 | Preprocessing, normalization & packet splitting | CP12 | ✅ Done |
 | CP14 | Document classification (describe-then-map per ADR-0010) | CP13 | ✅ Done |
-| CP15 | Structured extraction (grounded, schema-constrained) | CP14 | 🟡 In progress |
+| CP15 | Structured extraction (grounded, schema-constrained) | CP14 | ✅ Done |
 | CP16 | Validation, normalization & code systems | CP15 | ⬜ |
 | CP17 | Confidence calibration & escalation cascade | CP16 | ⬜ |
 | CP18 | Policy KB ingestion & vector store | CP11 | ⬜ |
@@ -67,4 +67,4 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 - **M5 — It's trustworthy** (CP26–CP29): eval gates, fine-tune, compliance.
 - **M6 — It's production** (CP30–CP34): scale/DR proven, cost controlled, launched.
 
-**Current progress:** CP01–CP14 done (CP04→CP07 partially deferred per ADR-0007) — **Milestone 1 (walking skeleton) COMPLETE**, and Phase D (AI core) underway: Tier-0 OCR with a real grounding contract (CP12), pixel-only page normalization + structural packet splitting (CP13), and document classification (CP14) all feed the pipeline with real work, verified against synthetic gates and the live local stack. Next: **CP15 — Structured extraction** · 10/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before GPU-served Tier-0 OCR.
+**Current progress:** CP01–CP03, CP04-L and CP08–CP15 done (CP04/CP05 deferred, CP06/CP07 partially deferred, per ADR-0007) — **Milestone 1 (walking skeleton) COMPLETE** and **Milestone 2 (*It reads*) at 5/7**: Tier-0 OCR with a real grounding contract (CP12), pixel-only page normalization + structural packet splitting (CP13), document classification at 98.3% (CP14), and deterministic label-anchored extraction at 98.5% with multi-packet fan-out proven end-to-end against a live Temporal (CP15). Next: **CP16 — Validation, normalization & code systems** · 11/34 complete. Cloud checkpoints (CP04/CP05 and the managed parts of CP06/CP07) are deferred per ADR-0007 and re-enter no later than just before GPU-served Tier-0 OCR.

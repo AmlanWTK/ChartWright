@@ -299,5 +299,123 @@ catchable by validation and neither is catchable by grounding.
 - **Multi-packet fan-out is not built.** Blocked on the same Docker outage, since it needs a
   migration plus CP08's tenant-isolation tests re-run against the new column.
 
+## Closing the checkpoint (2026-09-02)
+
+Everything under "Open at time of writing" is resolved or explicitly carried. That section
+is left exactly as written — the trail is worth more than a tidy document, and two of its
+entries turned out to be the most valuable things in it.
+
+### Multi-packet fan-out — built, and it found a bug the tests could not
+
+Migration 0003 makes the dedupe index partial (`WHERE parent_document_id IS NULL`) so
+children can reuse the parent's `content_hash`. `create_child_document` / `list_children`
+persist them; `_fan_out_packets` creates one child per packet with pages renumbered from 1.
+
+Writing the database tests found a live defect: `create_document` looked up by
+`content_hash` with `scalar_one_or_none()`, which raises `MultipleResultsFound` the moment
+children share the parent's hash. **Resubmitting a multi-packet fax would have crashed
+intake.** Scoped the query to `parent_document_id IS NULL`, matching the index.
+
+Then reading `workflows.py` found a larger one, and this is the part worth remembering:
+`_fan_out_packets` documented that *"the parent stops at NORMALIZED"* while
+`DocumentPipelineWorkflow.run` was a flat loop that knew nothing about children. So the
+parent — the upload, explicitly not a document to extract from — was classified, OCR'd,
+extracted and driven to COMPLETED, while the children sat at NORMALIZED forever. **All 18
+database and ingestion integration tests passed the entire time**, because the gap lived in
+the workflow layer and nothing ran a workflow over a multi-packet document. A docstring
+described behaviour that did not exist, and no test disagreed.
+
+ADR-0012 records the fix: after NORMALIZED the workflow asks `list_packet_children`, starts
+one child workflow per packet, awaits them, and advances the parent to COMPLETED. Children
+need no flag — `advance_stage` is idempotent by status index, so a child no-ops through
+NORMALIZED without re-normalizing, and its own empty child list terminates the recursion.
+The guard is the data, not a boolean that can drift from it.
+
+The test uses a **blank separator page**, not a feature-distance boundary. `HeuristicSplitter`
+has two independent signals and the blank-page one is unconditional, so this test does not
+depend on CP13's tuned `_BOUNDARY_DISTANCE_THRESHOLD`. It is a fan-out test, not a splitter
+test; coupling them would make a CP13 retune surface as a CP15 regression. It asserts each
+child audits exactly **8** status changes (9 would mean a child re-normalized), the parent
+exactly **2**, and that packet 2's page renumbers to 1 while still pointing at
+`page-0003.png` — proving the separator was dropped and the renumbering is right.
+
+### The integration tests that had never run
+
+CP15 could not close until they did, and getting there consumed most of a day on
+infrastructure rather than code. Recorded because the failure modes were instructive:
+
+- **MinIO's `InvalidAccessKeyId` was never a credentials problem.** Another local project's
+  MinIO held ports 9000/9001, so `cw-minio` had failed to bind and never started, and boto3
+  was authenticating against a stranger. A foreign MinIO on that port returns
+  `InvalidAccessKeyId` rather than refusing the connection, which is why it read as bad
+  credentials for an afternoon. Remapped to 19000/19001 following the precedent the compose
+  file already set for Postgres (15432), and `test_wiring_unit` now reads the host port out
+  of `docker-compose.yml` so the config default cannot drift from the mapping again.
+- **Three Docker images had corrupt local layers** (`exec format error`), a legacy of the
+  crash that also killed Postgres and MinIO with exit 255. `docker pull` reports "up to
+  date" and does nothing when the digest matches, so `docker rmi` first was required.
+- **The CP09 skip guard probed Postgres only**, so a down MinIO failed four tests as though
+  the code were broken rather than skipping. `ObjectStorage.check_ready()` probes
+  `head_bucket` and lets the error through; `exists()` swallows `ClientError` by design,
+  which makes a rejected credential indistinguishable from a missing object.
+- **The guards had no connect timeout.** A stopped container swallows the SYN rather than
+  refusing it, so an 18-test skip took **13 minutes**. `build_engine` gained
+  `connect_timeout`; measured 781.99s → 21.72s.
+
+### The hypothesis the measurement overturned
+
+The fan-out test first failed with the activity **cancelled** inside `detect_skew` — the
+signature of `start_to_close_timeout`, not of a logic error. The obvious reading was "three
+pages exceed a 30s budget," and it was wrong in its mechanism. `scripts/diag_normalize_timing.py`
+printed the page size: **4723×6112**, not 1700×2200.
+
+PIL's PDF encoder defaults to `resolution=72`, so saving a 1700×2200 image produces a PDF
+whose page *box* is 1700×2200 **points** — a 23.6 × 30.6 inch page. `load_pages` then renders
+that at `_PDF_RENDER_DPI = 200` into 28.9 megapixels: **7.7× the pixels, and 3.03s → 57s per
+page.** The fixture was the fault, not the page count. Fixed with `resolution=200.0` plus an
+assertion pinning the round-trip scale, because a regression there does not announce itself
+— it reappears as an unexplained timeout in a different file.
+
+The lesson is the same one CP14 recorded and CP15 repeated three more times this day:
+**verify the claim, not something adjacent to it.** A `Server: MinIO` header proves what
+software answers a port, never whose instance it is. A linter passing proves nothing if it
+is the wrong version reading the wrong config. And a timing number means nothing until you
+read the size of the thing being timed.
+
+### Gates at close
+
+| Gate | Result |
+|------|--------|
+| Extraction accuracy (clean slice) | **98.5%**, 0% missed |
+| Mechanism gates (self-verification, off-schema keys, determinism) | green |
+| Unit tests | **213** passed |
+| Integration — db + ingestion | **18** passed |
+| Integration — pipeline (Temporal) | **5** passed, incl. multi-packet fan-out |
+| Coverage | 84.06% (gate 80) |
+| ruff / ruff format / mypy --strict | clean |
+
+### Carried forward
+
+- **The 30s stage timeout caps a document at ~10 pages** at 3s/page. Real faxes run 5–30.
+  A fixed `start_to_close_timeout` is structurally wrong for a stage whose cost is linear in
+  pages; the Temporal answer is a generous timeout plus a short `heartbeat_timeout` with
+  `_normalize_document` heartbeating per page.
+- **`load_pages` applies `_PDF_RENDER_DPI` to any page box, with no size cap.** Its comment
+  claims PDF pages come out "comparable in scale" to the synthetic 1700px pages, which holds
+  only for a physically letter-sized box. A real upload with an odd box costs 57s/page.
+- **`check_ready()` uses boto3's defaults**, so a MinIO-only outage is slow the way Postgres
+  was. It does not bite today only because the Postgres probe runs first.
+- **`REFERRAL` still declares `label="Diagnosis (ICD-10)"`** — unchanged, and deliberately.
+  No generator, no evidence, and guessing is what caused the original bug.
+- **`clinical_justification` remains unmeasured.** CP16 inherits it.
+
 ## Execution log
-- (empty — awaiting approval)
+
+| Date | Event |
+|------|-------|
+| 2026-08-26 | Phase 0 spike: three reading paths measured before any implementation. VLM arms 0/24 groundable; deterministic anchor 23/24. ADR-0011 written; the approved design overturned by evidence. |
+| 2026-08-26 | Extractor built. Eval 90.8%, `urgency` 0% while passing self-verification — four wrong hypotheses before reading the source found schema/generator label drift. `test_label_consistency_unit.py` written; it found two further drifts on its first run. |
+| 2026-08-27 | Migration 0003 applied and rolled back cleanly; all 9 CP08 RLS isolation tests re-run green on the new schema. |
+| 2026-09-02 | Fan-out DB half proven (14 integration tests). `MultipleResultsFound` intake crash found by writing the test. |
+| 2026-09-02 | Local stack fully healthy for the first time: MinIO port collision diagnosed, corrupt images re-pulled, skip guards fixed and bounded. CP10's 4 lifecycle tests run for the first time — all pass. |
+| 2026-09-02 | ADR-0012 accepted (parent joins on children). Fan-out implemented; test failed on a fixture PDF page-box bug, diagnosed by measurement, fixed. **5/5 pipeline integration tests pass. CP15 closed.** |
