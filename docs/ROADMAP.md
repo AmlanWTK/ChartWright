@@ -38,6 +38,7 @@ This is the in-repo summary of the execution plan. The 34 checkpoints are delive
 | CP13 | Preprocessing, normalization & packet splitting | CP12 | ✅ Done |
 | CP14 | Document classification (describe-then-map per ADR-0010) | CP13 | ✅ Done |
 | CP15 | Structured extraction (grounded, schema-constrained) | CP14 | ✅ Done |
+| CP23-L | **Read-only review console (local)** — re-sequenced ahead of CP16 per ADR-0013; CP23/CP24 unchanged and supersede it | CP15 | 🟡 Specified |
 | CP16 | Validation, normalization & code systems | CP15 | ⬜ |
 | CP17 | Confidence calibration & escalation cascade | CP16 | ⬜ |
 | CP18 | Policy KB ingestion & vector store | CP11 | ⬜ |

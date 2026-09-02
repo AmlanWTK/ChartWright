@@ -18,6 +18,7 @@ ADRs capture significant architectural decisions with their context, options, an
 | [0010](0010-describe-then-map-classification.md) | Classify by describe-then-map, not constrained selection | Accepted |
 | [0011](0011-deterministic-label-anchored-extraction.md) | Extraction's cheapest tier uses no model at all | Accepted |
 | [0012](0012-packet-fanout-parent-joins-children.md) | A fanned-out upload completes when its packets complete | Accepted |
+| [0013](0013-read-only-console-ahead-of-cp16.md) | A read-only console comes before CP16 | Accepted |
 
 ## When to write an ADR
 
